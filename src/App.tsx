@@ -44,6 +44,21 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 };
 
+
+// 10進数の緯度経度を「度分秒」の文字列に変換する関数
+const formatDMS = (coordinate: number, isLat: boolean): string => {
+  const absolute = Math.abs(coordinate);
+  const degrees = Math.floor(absolute);
+  const minutesNotTruncated = (absolute - degrees) * 60;
+  const minutes = Math.floor(minutesNotTruncated);
+  const seconds = ((minutesNotTruncated - minutes) * 60).toFixed(1); // 小数点第1位まで
+  
+  // 緯度なら北緯(N)/南緯(S)、経度なら東経(E)/西経(W)
+  const direction = coordinate >= 0 ? (isLat ? 'N' : 'E') : (isLat ? 'S' : 'W');
+  
+  return `${degrees}°${minutes}'${seconds}"${direction}`;
+};
+
 const MetroLogo = ({ className = "" }: { className?: string }) => (
   <div className={`aspect-square flex items-center justify-center ${className}`}>
     <svg viewBox="0 0 100 100" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
@@ -638,8 +653,11 @@ export default function App() {
                     />
                     <div className="font-bold text-sm mt-1">{selectedLine.stations[currentIndex]?.name}</div>
                     <div className="text-[8px] font-mono text-neutral-400 mt-1">
-                      {selectedLine.stations[currentIndex]?.lat.toFixed(4)}, {selectedLine.stations[currentIndex]?.lng.toFixed(4)}
-                    </div>
+ 　　　　　　　　　　　{selectedLine.stations[currentIndex] ? (
+    　　　　　　　　　　`${formatDMS(selectedLine.stations[currentIndex].lat, true)}, ${formatDMS(selectedLine.stations[currentIndex].lng, false)}`
+  　　　　　　　　　　　) : ''}
+　　　　　　　　　　　</div>
+                    
                   </div>
                   <div className="px-2 z-10 flex flex-col items-center gap-1">
                     <ChevronRight className="w-6 h-6 text-neutral-300" />
@@ -656,8 +674,10 @@ export default function App() {
                     />
                     <div className="font-bold text-sm mt-1">{selectedLine.stations[currentIndex + step]?.name}</div>
                     <div className="text-[8px] font-mono text-neutral-400 mt-1">
-                      {selectedLine.stations[currentIndex + step]?.lat.toFixed(4)}, {selectedLine.stations[currentIndex + step]?.lng.toFixed(4)}
-                    </div>
+  　　　　　　　　　　{selectedLine.stations[currentIndex + step] ? (
+    　　　　　　　　　`${formatDMS(selectedLine.stations[currentIndex + step].lat, true)}, ${formatDMS(selectedLine.stations[currentIndex + step].lng, false)}`
+  　　　　　　　　　　) : ''}
+　　　　　　　　　　　</div>
                   </div>
                 </div>
 
