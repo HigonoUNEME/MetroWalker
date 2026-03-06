@@ -256,13 +256,45 @@ export default function App() {
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCapturedPhoto(reader.result as string);
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      // 1. 読み込んだ画像をImageオブジェクトにする
+      const img = new Image();
+      img.onload = () => {
+        // 2. 最大サイズを決める（ここでは横幅最大800px）
+        const MAX_WIDTH = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height = Math.round((height *= MAX_WIDTH / width));
+          width = MAX_WIDTH;
+        }
+
+        // 3. Canvasという仮想の画用紙を作って、縮小した画像を描き込む
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // 4. 画像をJPEG形式にし、画質を70% (0.7) に落として軽量化！
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          
+          // 5. 軽くなった画像をセットする
+          setCapturedPhoto(compressedDataUrl);
+        }
       };
-      reader.readAsDataURL(file);
-    }
+      
+      if (event.target?.result) {
+        img.src = event.target.result as string;
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const resetApp = () => {
