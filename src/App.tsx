@@ -333,6 +333,36 @@ export default function App() {
     setShowResetConfirm(false);
   };
 
+  
+// シェアボタンを押した時の処理
+  const handleShare = async () => {
+    // シェアしたいテキスト（※お好みに合わせて変更してください）
+    const shareText = `MetroWalkerで東京メトロを散歩しました！🚶‍♂️✨\n#MetroWalker #東京散歩`;
+    const shareUrl = window.location.href; // 現在のVercel等のURL
+
+    if (navigator.share) {
+      // スマホなど、ネイティブのShare APIが使える環境
+      try {
+        await navigator.share({
+          title: 'MetroWalker',
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (error) {
+        console.log('シェアがキャンセルされたか、失敗しました', error);
+      }
+    } else {
+      // PCなど、Share APIが使えない環境はクリップボードにコピーする
+      try {
+        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+        alert('クリップボードにコピーしました！X（Twitter）やLINEなどに貼り付けてシェアしてください。');
+      } catch (err) {
+        alert('お使いのブラウザではシェア機能がサポートされていません。');
+      }
+    }
+  };
+
+  
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 font-sans selection:bg-neutral-200">
       <div className="max-w-md mx-auto min-h-screen flex flex-col shadow-xl bg-white relative overflow-hidden">
@@ -889,6 +919,14 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+                
+                <button
+                  onClick={handleShare}
+                  className="w-full flex items-center justify-center gap-2 bg-neutral-800 text-white p-4 rounded-2xl font-bold hover:bg-neutral-700 transition-all mt-6"
+                >
+                  <Share2 className="w-5 h-5" />
+                  結果をシェアする
+                </button>
 
                 <div className="space-y-3">
                   <button 
