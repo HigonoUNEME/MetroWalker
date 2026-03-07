@@ -339,6 +339,7 @@ export default function App() {
     // シェアしたいテキスト（※お好みに合わせて変更してください）
     const shareText = `MetroWalkerで東京メトロを散歩しました！🚶‍♂️✨\n#MetroWalker #東京散歩`;
     const shareUrl = window.location.href; // 現在のVercel等のURL
+    
 
     if (navigator.share) {
       // スマホなど、ネイティブのShare APIが使える環境
@@ -929,13 +930,6 @@ export default function App() {
                 </button>
 
                 <div className="space-y-3">
-                  <button 
-                    onClick={() => {}} // Placeholder for share
-                    className="w-full bg-neutral-100 text-neutral-900 p-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-200 transition-all"
-                  >
-                    <Share2 className="w-5 h-5" />
-                    <span>Share Journey</span>
-                  </button>
                   <button 
                     onClick={resetApp}
                     className="w-full text-neutral-400 p-4 rounded-2xl font-bold hover:text-neutral-600 transition-all"
