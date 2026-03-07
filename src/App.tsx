@@ -123,7 +123,7 @@ const LineLogo = ({ line, size = "w-8 h-8", fontSize = "text-xs" }: { line: Metr
 export default function App() {
   const [state, setState] = useState<AppState>('START');
   const [selectedLine, setSelectedLine] = useState<MetroLine | null>(null);
-  const [teamName, setTeamName] = useState('同期三人衆');
+  const [teamName, setTeamName] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('NORMAL');
   const [startStationIndex, setStartStationIndex] = useState(0);
   const [endStationIndex, setEndStationIndex] = useState(0);
@@ -366,7 +366,7 @@ export default function App() {
     setCurrentQuest(null);
     setHistory([]);
     setCapturedPhoto(null);
-    setTeamName('同期三人衆');
+    setTeamName('');
     setDifficulty('NORMAL');
     setStartTime(null);
     setLastStationTime(null);
