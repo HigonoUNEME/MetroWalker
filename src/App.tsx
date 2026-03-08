@@ -22,6 +22,7 @@ import {
   Loader2,
   X
 } from 'lucide-react';
+import html2canvas from 'html2canvas'; // 👈 追加：画像化ライブラリの読み込み
 import { METRO_LINES, MetroLine, Station } from './constants';
 import { generateQuest, SanpoQuest } from './services/geminiService';
 import StationLogo from './components/StationLogo';
@@ -142,6 +143,7 @@ export default function App() {
   const [lastStationTime, setLastStationTime] = useState<number | null>(null);
   const [showRouteMap, setShowRouteMap] = useState(false);
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
+  
   const shareCardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -492,7 +494,6 @@ export default function App() {
                       const start = Math.min(startStationIndex, endStationIndex);
                       const end = Math.max(startStationIndex, endStationIndex);
                       
-                      // 進行方向にあわせて通過済みか判定
                       const isPassed = state !== 'START' && state !== 'SETUP' && 
                         (isReverse 
                           ? (index >= currentIndex && index <= startStationIndex)
@@ -502,7 +503,6 @@ export default function App() {
 
                       return (
                         <div key={index} className={`mb-8 last:mb-0 relative flex items-center pl-8 ${isTarget ? 'opacity-100' : 'opacity-40'}`}>
-                          {/* Station Node */}
                           <div 
                             className={`absolute -left-[14px] w-6 h-6 rounded-full border-4 border-white flex items-center justify-center transition-all duration-300
                               ${isCurrent ? 'scale-150 shadow-lg z-10' : 'z-0'}
@@ -929,13 +929,6 @@ export default function App() {
                   </div>
                 </div>
                 
-                <button onClick={handleShare} className="w-full flex items-center justify-center gap-2 bg-neutral-800 text-white p-4 rounded-2xl font-bold hover:bg-neutral-700 transition-all mt-6">
-                  <Share2 className="w-5 h-5" /> 結果をシェアする
-                </button>
-
-                {/* 既存の Journey Highlights の下あたりに配置します */}
-                
-                {/* シェアボタン（ローディング対応） */}
                 <button 
                   onClick={handleShare} 
                   disabled={isGeneratingShare}
@@ -1019,14 +1012,6 @@ export default function App() {
                 </div>
                 {/* 👆 隠しデザインここまで 👆 */}
 
-              </motion.div>
-            )}
-            
-                <div className="space-y-3">
-                  <button onClick={resetApp} className="w-full text-neutral-400 p-4 rounded-2xl font-bold hover:text-neutral-600 transition-all">
-                    Back to Home
-                  </button>
-                </div>
               </motion.div>
             )}
           </AnimatePresence>
