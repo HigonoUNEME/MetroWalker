@@ -22,7 +22,7 @@ import {
   Loader2,
   X
 } from 'lucide-react';
-import html2canvas from 'html2canvas'; // 👈 追加：画像化ライブラリの読み込み
+import html2canvas from 'html2canvas';
 import { METRO_LINES, MetroLine, Station } from './constants';
 import { generateQuest, SanpoQuest } from './services/geminiService';
 import StationLogo from './components/StationLogo';
@@ -35,8 +35,8 @@ interface WalkHistory {
   to: Station;
   quest: SanpoQuest;
   photo?: string;
-  timeTakenMs?: number; // 駅間にかかった時間
-  timestamp?: number;   // 到着時刻
+  timeTakenMs?: number;
+  timestamp?: number;
 }
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -60,7 +60,6 @@ const formatDMS = (coordinate: number, isLat: boolean): string => {
   return `${degrees}°${minutes}'${seconds}"${direction}`;
 };
 
-// ミリ秒を「〇分〇秒」に変換する関数
 const formatTimeMs = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
@@ -70,7 +69,6 @@ const formatTimeMs = (ms: number) => {
   return `${minutes}分${seconds}秒`;
 };
 
-// リアルタイムタイマーコンポーネント
 const TimerDisplay = ({ startTime }: { startTime: number }) => {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -138,7 +136,6 @@ export default function App() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
   
-  // 新機能用のState
   const [startTime, setStartTime] = useState<number | null>(null);
   const [lastStationTime, setLastStationTime] = useState<number | null>(null);
   const [showRouteMap, setShowRouteMap] = useState(false);
@@ -174,7 +171,6 @@ export default function App() {
     return calculateDistance(s1.lat, s1.lng, s2.lat, s2.lng);
   })() : 0;
 
-  // 初期読み込み (localStorage)
   useEffect(() => {
     const savedState = localStorage.getItem('metro-walker-state');
     const savedLineId = localStorage.getItem('metro-walker-line-id');
@@ -202,7 +198,6 @@ export default function App() {
     if (savedLastTime) setLastStationTime(parseInt(savedLastTime, 10));
   }, []);
 
-  // 状態の保存 (localStorage)
   useEffect(() => {
     localStorage.setItem('metro-walker-state', state);
     localStorage.setItem('metro-walker-team-name', teamName);
@@ -269,7 +264,6 @@ export default function App() {
     const toStation = selectedLine.stations[nextIdx];
     if (!fromStation || !toStation) return;
 
-    // 経過時間を計算して記録
     const now = Date.now();
     const timeTakenMs = lastStationTime ? now - lastStationTime : 0;
     setLastStationTime(now);
@@ -335,7 +329,7 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // 画像化してシェアする本格的な機能
+  // 画像化してシェアする本格的な機能（エラーハンドリング強化版）
   const handleShare = async () => {
     if (!shareCardRef.current || !selectedLine) return;
     setIsGeneratingShare(true);
@@ -343,41 +337,56 @@ export default function App() {
     try {
       // 1. 隠しデザインをキャンバス（画像）に変換
       const canvas = await html2canvas(shareCardRef.current, {
-        scale: 2, // 高画質化
-        backgroundColor: '#171717', // 背景色（neutral-900相当）
+        scale: 2, 
+        backgroundColor: '#171717', 
+        width: 1080, // 明示的にサイズを指定してエラーを回避
+        height: 1080,
         useCORS: true,
       });
 
       // 2. キャンバスを画像ファイル（Blob）に変換
       canvas.toBlob(async (blob) => {
-        if (!blob) throw new Error('画像生成に失敗しました');
+        if (!blob) {
+          setIsGeneratingShare(false);
+          alert('画像データの作成に失敗しました。');
+          return;
+        }
 
         const file = new File([blob], 'metrowalker-result.png', { type: 'image/png' });
         const shareText = `MetroWalkerで${selectedLine.name}を歩き切りました！🚶‍♂️✨\n#MetroWalker #東京散歩`;
 
-        // 3. 画像シェアに対応している端末（スマホなど）かチェック
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            title: 'MetroWalker',
-            text: shareText,
-            files: [file], // ここで画像を渡す！
-          });
-        } else {
-          // PC等、画像直接シェア非対応の場合は画像をダウンロードさせる
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'metrowalker-result.png';
-          a.click();
-          URL.revokeObjectURL(url);
-          alert('結果画像をダウンロードしました！X（Twitter）やLINEに添付してシェアしてください。');
+        try {
+          // 3. 画像シェアに対応している端末（スマホなど）かチェック
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              title: 'MetroWalker',
+              text: shareText,
+              files: [file],
+            });
+          } else {
+            // PC等、画像直接シェア非対応の場合は画像をダウンロードさせる
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'metrowalker-result.png';
+            a.click();
+            URL.revokeObjectURL(url);
+            alert('結果画像をダウンロードしました！X（Twitter）やLINEに添付してシェアしてください。');
+          }
+        } catch (shareErr: any) {
+          // ★修正ポイント: ユーザーがシェアを途中でキャンセルした場合はエラーアラートを出さない
+          if (shareErr.name !== 'AbortError') {
+            console.error('Share API Error:', shareErr);
+            alert('シェア画面の呼び出しに失敗しました。');
+          }
+        } finally {
+          setIsGeneratingShare(false);
         }
-        setIsGeneratingShare(false);
       }, 'image/png');
 
     } catch (error) {
-      console.error('シェア処理エラー:', error);
-      alert('画像の生成に失敗しました。');
+      console.error('html2canvas Error:', error);
+      alert('画像の生成処理に失敗しました。');
       setIsGeneratingShare(false);
     }
   };
@@ -946,72 +955,6 @@ export default function App() {
                     Back to Home
                   </button>
                 </div>
-
-                {/* 👇 画像化するための「隠しデザイン（シェアカード）」 👇 */}
-                <div className="absolute -left-[9999px] -top-[9999px]">
-                  <div 
-                    ref={shareCardRef} 
-                    className="w-[1080px] h-[1080px] bg-neutral-900 p-16 flex flex-col justify-between relative overflow-hidden font-sans"
-                  >
-                    {/* 背景の装飾 */}
-                    <div className="absolute -right-20 -top-20 opacity-10">
-                      <MetroLogo className="w-[600px] h-[600px]" />
-                    </div>
-
-                    {/* ヘッダー */}
-                    <div className="flex items-center gap-8 z-10">
-                      <div className="w-32 h-32 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg">
-                        <Trophy className="w-16 h-16 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-7xl font-black text-white tracking-tight">制覇完了！</h2>
-                        <p className="text-4xl text-neutral-400 mt-4 font-bold">{selectedLine.name} / 全{totalSteps + 1}駅</p>
-                      </div>
-                    </div>
-
-                    {/* メインの記録 */}
-                    <div className="grid grid-cols-2 gap-8 z-10">
-                      <div className="bg-white/10 p-10 rounded-3xl backdrop-blur-md">
-                        <div className="text-3xl font-bold text-white/50 uppercase tracking-widest mb-4">Total Walk</div>
-                        <div className="text-7xl font-black text-white">{totalDistance.toFixed(2)}<span className="text-4xl ml-2 text-white/70">km</span></div>
-                      </div>
-                      <div className="bg-white/10 p-10 rounded-3xl backdrop-blur-md">
-                        <div className="text-3xl font-bold text-white/50 uppercase tracking-widest mb-4">Time</div>
-                        <div className="text-7xl font-black text-white">{startTime ? formatTimeMs(Date.now() - startTime) : '--:--'}</div>
-                      </div>
-                    </div>
-
-                    {/* 撮影した写真（最大4枚） */}
-                    {history.filter(h => h.photo).length > 0 && (
-                      <div className="flex gap-6 z-10">
-                        {history.filter(h => h.photo).slice(0, 4).map((item, i) => (
-                          <div key={i} className="w-56 h-56 rounded-3xl overflow-hidden border-4 border-white/20 bg-neutral-800">
-                            <img src={item.photo} className="w-full h-full object-cover" />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* フッター */}
-                    <div className="flex items-end justify-between z-10 border-t-2 border-white/10 pt-10 mt-auto">
-                      <div className="flex items-center gap-6">
-                        <LineLogo line={selectedLine} size="w-20 h-20" fontSize="text-4xl" />
-                        <div>
-                          <div className="text-4xl font-bold text-white">
-                            {selectedLine.stations[startStationIndex]?.name} ➔ {selectedLine.stations[endStationIndex]?.name}
-                          </div>
-                          <div className="text-2xl text-neutral-400 mt-2">Team: {teamName}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-5xl font-black text-white tracking-tighter">MetroWalker</div>
-                        <div className="text-2xl text-neutral-500 font-bold tracking-widest uppercase mt-2">Tokyo Subway Journey</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {/* 👆 隠しデザインここまで 👆 */}
-
               </motion.div>
             )}
           </AnimatePresence>
@@ -1038,7 +981,75 @@ export default function App() {
           </div>
         )}
 
-      </div>
+      </div> {/* ← ここまでが本来のアプリの枠 */}
+
+      {/* 👇 画像化するための「隠しデザイン（シェアカード）」。枠外に置いてエラーを防ぎます 👇 */}
+      {state === 'SUMMARY' && selectedLine && (
+        <div className="fixed -left-[9999px] -top-[9999px]">
+          <div 
+            ref={shareCardRef} 
+            className="w-[1080px] h-[1080px] bg-neutral-900 p-16 flex flex-col justify-between relative overflow-hidden font-sans"
+          >
+            {/* 背景の装飾 */}
+            <div className="absolute -right-20 -top-20 opacity-10">
+              <MetroLogo className="w-[600px] h-[600px]" />
+            </div>
+
+            {/* ヘッダー */}
+            <div className="flex items-center gap-8 z-10">
+              <div className="w-32 h-32 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg">
+                <Trophy className="w-16 h-16 text-white" />
+              </div>
+              <div>
+                <h2 className="text-7xl font-black text-white tracking-tight">制覇完了！</h2>
+                <p className="text-4xl text-neutral-400 mt-4 font-bold">{selectedLine.name} / 全{totalSteps + 1}駅</p>
+              </div>
+            </div>
+
+            {/* メインの記録 */}
+            <div className="grid grid-cols-2 gap-8 z-10">
+              <div className="bg-white/10 p-10 rounded-3xl backdrop-blur-md">
+                <div className="text-3xl font-bold text-white/50 uppercase tracking-widest mb-4">Total Walk</div>
+                <div className="text-7xl font-black text-white">{totalDistance.toFixed(2)}<span className="text-4xl ml-2 text-white/70">km</span></div>
+              </div>
+              <div className="bg-white/10 p-10 rounded-3xl backdrop-blur-md">
+                <div className="text-3xl font-bold text-white/50 uppercase tracking-widest mb-4">Time</div>
+                <div className="text-7xl font-black text-white">{startTime ? formatTimeMs(Date.now() - startTime) : '--:--'}</div>
+              </div>
+            </div>
+
+            {/* 撮影した写真（最大4枚） */}
+            {history.filter(h => h.photo).length > 0 && (
+              <div className="flex gap-6 z-10">
+                {history.filter(h => h.photo).slice(0, 4).map((item, i) => (
+                  <div key={i} className="w-56 h-56 rounded-3xl overflow-hidden border-4 border-white/20 bg-neutral-800">
+                    <img src={item.photo} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* フッター */}
+            <div className="flex items-end justify-between z-10 border-t-2 border-white/10 pt-10 mt-auto">
+              <div className="flex items-center gap-6">
+                <LineLogo line={selectedLine} size="w-20 h-20" fontSize="text-4xl" />
+                <div>
+                  <div className="text-4xl font-bold text-white">
+                    {selectedLine.stations[startStationIndex]?.name} ➔ {selectedLine.stations[endStationIndex]?.name}
+                  </div>
+                  <div className="text-2xl text-neutral-400 mt-2">Team: {teamName}</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-5xl font-black text-white tracking-tighter">MetroWalker</div>
+                <div className="text-2xl text-neutral-500 font-bold tracking-widest uppercase mt-2">Tokyo Subway Journey</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 👆 隠しデザインここまで 👆 */}
+
     </div>
   );
 }
