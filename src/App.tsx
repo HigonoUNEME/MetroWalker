@@ -14,15 +14,14 @@ import {
   CheckCircle2, 
   Trophy,
   Info,
-  ArrowLeft,
-  Share2,
-  UtensilsCrossed,
-  Clock,
-  Map,
-  Loader2,
+  ArrowLeft, 
+  Share2, 
+  UtensilsCrossed, 
+  Clock, 
+  Map, 
+  Loader2, 
   X
 } from 'lucide-react';
-// 💡 html2canvasのインポートは削除しました！
 
 import { METRO_LINES, MetroLine, Station } from './constants';
 import { generateQuest, SanpoQuest } from './services/geminiService';
@@ -303,7 +302,7 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
-      img.onload = async () => { // 💡 asyncを追加
+      img.onload = async () => {
         const MAX_WIDTH = 800;
         let width = img.width;
         let height = img.height;
@@ -321,16 +320,15 @@ export default function App() {
           ctx.drawImage(img, 0, 0, width, height);
           const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
           
-          // 💡 ここから追加：Vercel Blobへアップロード！
           try {
             const response = await fetch(compressedDataUrl);
             const blobData = await response.blob();
+            // 💡 隔離した新しいパスへリクエスト
             const uploadResponse = await fetch(`/api/upload?filename=${Date.now()}.jpg`, {
               method: 'POST',
               body: blobData,
             });
             const result = await uploadResponse.json();
-            // インターネット上の写真URLをセットする
             setCapturedPhoto(result.url); 
           } catch (err) {
             console.error('Upload failed', err);
@@ -343,22 +341,17 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-// 💡 【Level 2】サーバー(Vercel OG)に写真URLも送る、強化版シェア機能
   const handleShare = async () => {
     if (!selectedLine) return;
     setIsGeneratingShare(true);
 
     try {
       const timeStr = startTime ? formatTimeMs(Date.now() - startTime) : '--:--';
-      
-      // 1. 履歴の中から「写真のURL」があるものだけを最大4枚取り出す
-      // historyの中に保存されているcapturedPhoto（Vercel BlobのURL）を使います
       const photoUrls = history
-        .filter(item => item.photo) // 写真がある履歴に絞る
-        .map(item => item.photo)    // URL文字列の配列にする
-        .slice(0, 4);               // 最大4枚に制限
+        .filter(item => item.photo)
+        .map(item => item.photo)
+        .slice(0, 4);
 
-      // 2. サーバーに渡す「歩いたデータ」をURL用の文字にまとめる
       const params = new URLSearchParams({
         line: selectedLine.name,
         dist: totalDistance.toFixed(2),
@@ -369,24 +362,21 @@ export default function App() {
         stations: (totalSteps + 1).toString()
       });
 
-      // 3. 写真のURLをパラメータ（p1=..., p2=...）として追加する
       photoUrls.forEach((url, i) => {
         if (url) params.append(`p${i + 1}`, url);
       });
 
-      // 4. サーバープログラム(api/og.tsx)を呼び出して、画像を生成！
+      // 💡 隔離した新しいパスへリクエスト
       const ogUrl = `/api/og?${params.toString()}`;
       const response = await fetch(ogUrl);
       if (!response.ok) throw new Error('サーバーでの画像生成に失敗しました');
       
-      // 5. 生成された画像データ（Blob）を受け取り、ファイル形式に変換
       const blob = await response.blob();
       const file = new File([blob], 'metrowalker-result.png', { type: 'image/png' });
 
       const shareText = `MetroWalkerで${selectedLine.name}を歩き切りました！🚶‍♂️✨\n#MetroWalker #東京散歩\n`;
       const shareUrl = window.location.href;
 
-      // 6. スマホのOSシェア機能に、完成した「写真入り画像」を渡す
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           title: 'MetroWalker',
@@ -394,19 +384,16 @@ export default function App() {
           files: [file],
         });
       } else {
-        // PC等の場合は画像をダウンロードさせ、テキストをクリップボードにコピー
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = 'metrowalker-result.png';
         a.click();
         URL.revokeObjectURL(url);
-        
         await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
-        alert('思い出の詰まった画像をダウンロードしました！SNSに添付してシェアしてください。');
+        alert('画像をダウンロードしました！SNSに添付してシェアしてください。');
       }
     } catch (error: any) {
-      // ユーザーがシェア画面を閉じた（キャンセルした）だけの場合はエラーを出さない
       if (error.name !== 'AbortError') {
         console.error('Share API Error:', error);
         alert('シェア画像の準備中にエラーが発生しました。');
@@ -527,12 +514,10 @@ export default function App() {
                       const isCurrent = index === currentIndex && (state === 'WALKING' || state === 'SUMMARY');
                       const start = Math.min(startStationIndex, endStationIndex);
                       const end = Math.max(startStationIndex, endStationIndex);
-                      
                       const isPassed = state !== 'START' && state !== 'SETUP' && 
                         (isReverse 
                           ? (index >= currentIndex && index <= startStationIndex)
                           : (index <= currentIndex && index >= startStationIndex));
-                      
                       const isTarget = index >= start && index <= end;
 
                       return (
