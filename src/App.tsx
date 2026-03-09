@@ -22,7 +22,8 @@ import {
   Loader2,
   X
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
+// 💡 html2canvasのインポートは削除しました！
+
 import { METRO_LINES, MetroLine, Station } from './constants';
 import { generateQuest, SanpoQuest } from './services/geminiService';
 import StationLogo from './components/StationLogo';
@@ -141,7 +142,6 @@ export default function App() {
   const [showRouteMap, setShowRouteMap] = useState(false);
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   
-  const shareCardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isReverse = selectedLine ? startStationIndex > endStationIndex : false;
@@ -329,7 +329,7 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // サーバー(Vercel OG)で爆速生成するシェア機能
+  // 💡 ここからが「サーバー(Vercel OG)で爆速生成するシェア機能」です！
   const handleShare = async () => {
     if (!selectedLine) return;
     setIsGeneratingShare(true);
@@ -342,13 +342,13 @@ export default function App() {
         line: selectedLine.name,
         dist: totalDistance.toFixed(2),
         time: timeStr,
-        team: teamName,
+        team: teamName || 'ゲスト',
         start: selectedLine.stations[startStationIndex]?.name || '',
         end: selectedLine.stations[endStationIndex]?.name || '',
         stations: (totalSteps + 1).toString()
       });
 
-      // 2. 先ほど作ったサーバープログラム(api/og.tsx)を呼び出して、画像をダウンロード！
+      // 2. サーバープログラム(api/og.tsx)を呼び出して、画像をダウンロード！
       const ogUrl = `/api/og?${params.toString()}`;
       const response = await fetch(ogUrl);
       if (!response.ok) throw new Error('サーバーでの画像生成に失敗しました');
@@ -975,9 +975,7 @@ export default function App() {
           </div>
         )}
 
-      </div> {/* ← ここまでが本来のアプリの枠 */}
-
-      
+      </div>
     </div>
   );
 }
