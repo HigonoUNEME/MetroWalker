@@ -17,7 +17,6 @@ export default function handler(request: Request) {
     const end = searchParams.get('end') || 'Goal';
     const stations = searchParams.get('stations') || '0';
     
-    // 写真のURLを最大4枚まで受け取る
     const photos = [
       searchParams.get('p1'),
       searchParams.get('p2'),
@@ -27,13 +26,10 @@ export default function handler(request: Request) {
 
     return new ImageResponse(
       (
-        <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', backgroundColor: '#171717', padding: '80px', fontFamily: 'sans-serif' }}>
-          
-          {/* 背景の大きなロゴ装飾 */}
+        <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', backgroundColor: '#171717', padding: '80px', fontFamily: 'sans-serif', position: 'relative' }}>
           <div style={{ position: 'absolute', right: '-100px', top: '-100px', opacity: 0.05, display: 'flex' }}>
              <svg width="600" height="600" viewBox="0 0 100 100"><path d="M10 80 L30 30 L50 80 L70 30 L90 80" stroke="white" strokeWidth="8" fill="none" /></svg>
           </div>
-
           <div style={{ display: 'flex', alignItems: 'center', zIndex: 10 }}>
             <div style={{ width: '120px', height: '120px', backgroundColor: '#facc15', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
@@ -43,8 +39,6 @@ export default function handler(request: Request) {
               <div style={{ fontSize: '40px', color: '#a3a3a3', marginTop: '20px' }}>{`${lineName} / 全${stations}駅`}</div>
             </div>
           </div>
-
-          {/* 記録部分 */}
           <div style={{ display: 'flex', gap: '40px', zIndex: 10 }}>
             <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'rgba(255,255,255,0.1)', padding: '50px', borderRadius: '32px', flex: 1 }}>
               <div style={{ fontSize: '30px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '4px' }}>Total Walk</div>
@@ -58,28 +52,18 @@ export default function handler(request: Request) {
               <div style={{ fontSize: '80px', fontWeight: 900, color: 'white', marginTop: '10px' }}>{time}</div>
             </div>
           </div>
-
-          {/* 📸 写真を表示するエリア（新設！） */}
           {photos.length > 0 && (
             <div style={{ display: 'flex', gap: '24px', zIndex: 10 }}>
               {photos.map((src, i) => (
-                <img 
-                  key={i} 
-                  src={src} 
-                  style={{ width: '210px', height: '210px', borderRadius: '24px', objectFit: 'cover', border: '4px solid rgba(255,255,255,0.2)' }} 
-                />
+                <img key={i} src={src} style={{ width: '210px', height: '210px', borderRadius: '24px', objectFit: 'cover', border: '4px solid rgba(255,255,255,0.2)' }} />
               ))}
             </div>
           )}
-
-          {/* フッター */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '2px solid rgba(255,255,255,0.1)', paddingTop: '50px', zIndex: 10 }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', fontSize: '40px', fontWeight: 'bold', color: 'white' }}>
                 <div style={{ display: 'flex' }}>{start}</div>
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#a3a3a3" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 20px' }}>
-                  <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#a3a3a3" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 20px' }}><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
                 <div style={{ display: 'flex' }}>{end}</div>
               </div>
               <div style={{ fontSize: '30px', color: '#a3a3a3', marginTop: '15px' }}>{`Team: ${team}`}</div>
