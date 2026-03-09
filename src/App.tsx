@@ -303,11 +303,10 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => { // 💡 asyncを追加
         const MAX_WIDTH = 800;
         let width = img.width;
         let height = img.height;
-
         if (width > MAX_WIDTH) {
           height = Math.round((height *= MAX_WIDTH / width));
           width = MAX_WIDTH;
@@ -321,7 +320,22 @@ export default function App() {
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
           const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          setCapturedPhoto(compressedDataUrl);
+          
+          // 💡 ここから追加：Vercel Blobへアップロード！
+          try {
+            const response = await fetch(compressedDataUrl);
+            const blobData = await response.blob();
+            const uploadResponse = await fetch(`/api/upload?filename=${Date.now()}.jpg`, {
+              method: 'POST',
+              body: blobData,
+            });
+            const result = await uploadResponse.json();
+            // インターネット上の写真URLをセットする
+            setCapturedPhoto(result.url); 
+          } catch (err) {
+            console.error('Upload failed', err);
+            alert('写真のアップロードに失敗しました。');
+          }
         }
       };
       if (event.target?.result) img.src = event.target.result as string;
