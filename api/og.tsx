@@ -24,7 +24,6 @@ export default function handler(request: Request) {
           {/* ヘッダー部分 */}
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <div style={{ width: '120px', height: '120px', backgroundColor: '#facc15', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {/* 🏆 を SVGアイコンに変更 */}
               <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
                 <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
@@ -36,7 +35,7 @@ export default function handler(request: Request) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '40px' }}>
               <div style={{ fontSize: '80px', fontWeight: 900, color: 'white', margin: 0, lineHeight: 1 }}>制覇完了！</div>
-              <div style={{ fontSize: '40px', color: '#a3a3a3', marginTop: '20px' }}>{lineName} / 全{stations}駅</div>
+              <div style={{ fontSize: '40px', color: '#a3a3a3', marginTop: '20px' }}>{`${lineName} / 全${stations}駅`}</div>
             </div>
           </div>
 
@@ -44,7 +43,13 @@ export default function handler(request: Request) {
           <div style={{ display: 'flex', gap: '40px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'rgba(255,255,255,0.1)', padding: '50px', borderRadius: '32px', flex: 1 }}>
               <div style={{ fontSize: '30px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '4px' }}>Total Walk</div>
-              <div style={{ fontSize: '80px', fontWeight: 900, color: 'white', marginTop: '10px' }}>{totalDistance} <span style={{ fontSize: '40px', color: 'rgba(255,255,255,0.7)' }}>km</span></div>
+              
+              {/* 👇 エラー修正箇所：要素が2つあるので display: 'flex' を明示しました 👇 */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', marginTop: '10px' }}>
+                <div style={{ fontSize: '80px', fontWeight: 900, color: 'white', lineHeight: 1 }}>{totalDistance}</div>
+                <div style={{ fontSize: '40px', color: 'rgba(255,255,255,0.7)', marginLeft: '10px', paddingBottom: '8px' }}>km</div>
+              </div>
+
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'rgba(255,255,255,0.1)', padding: '50px', borderRadius: '32px', flex: 1 }}>
               <div style={{ fontSize: '30px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '4px' }}>Time</div>
@@ -56,17 +61,17 @@ export default function handler(request: Request) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '2px solid rgba(255,255,255,0.1)', paddingTop: '50px' }}>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               
+              {/* 👇 ここも念のため要素をすべて display: 'flex' で囲んでいます 👇 */}
               <div style={{ display: 'flex', alignItems: 'center', fontSize: '40px', fontWeight: 'bold', color: 'white' }}>
-                <span>{start}</span>
-                {/* ➔ を SVGアイコンに変更 */}
+                <div style={{ display: 'flex' }}>{start}</div>
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#a3a3a3" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 20px' }}>
                   <path d="M5 12h14" />
                   <path d="m12 5 7 7-7 7" />
                 </svg>
-                <span>{end}</span>
+                <div style={{ display: 'flex' }}>{end}</div>
               </div>
 
-              <div style={{ fontSize: '30px', color: '#a3a3a3', marginTop: '15px' }}>Team: {team}</div>
+              <div style={{ fontSize: '30px', color: '#a3a3a3', marginTop: '15px' }}>{`Team: ${team}`}</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <div style={{ fontSize: '50px', fontWeight: 900, color: 'white', letterSpacing: '-2px' }}>MetroWalker</div>
