@@ -343,7 +343,7 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // 💡 ここからが「サーバー(Vercel OG)で爆速生成するシェア機能」です！
+// 💡 【Level 2】サーバー(Vercel OG)に写真URLも送る、強化版シェア機能
   const handleShare = async () => {
     if (!selectedLine) return;
     setIsGeneratingShare(true);
@@ -351,7 +351,14 @@ export default function App() {
     try {
       const timeStr = startTime ? formatTimeMs(Date.now() - startTime) : '--:--';
       
-      // 1. サーバーに渡す「歩いたデータ」をURL用の文字にまとめる
+      // 1. 履歴の中から「写真のURL」があるものだけを最大4枚取り出す
+      // historyの中に保存されているcapturedPhoto（Vercel BlobのURL）を使います
+      const photoUrls = history
+        .filter(item => item.photo) // 写真がある履歴に絞る
+        .map(item => item.photo)    // URL文字列の配列にする
+        .slice(0, 4);               // 最大4枚に制限
+
+      // 2. サーバーに渡す「歩いたデータ」をURL用の文字にまとめる
       const params = new URLSearchParams({
         line: selectedLine.name,
         dist: totalDistance.toFixed(2),
@@ -362,18 +369,24 @@ export default function App() {
         stations: (totalSteps + 1).toString()
       });
 
-      // 2. サーバープログラム(api/og.tsx)を呼び出して、画像をダウンロード！
+      // 3. 写真のURLをパラメータ（p1=..., p2=...）として追加する
+      photoUrls.forEach((url, i) => {
+        if (url) params.append(`p${i + 1}`, url);
+      });
+
+      // 4. サーバープログラム(api/og.tsx)を呼び出して、画像を生成！
       const ogUrl = `/api/og?${params.toString()}`;
       const response = await fetch(ogUrl);
       if (!response.ok) throw new Error('サーバーでの画像生成に失敗しました');
       
+      // 5. 生成された画像データ（Blob）を受け取り、ファイル形式に変換
       const blob = await response.blob();
       const file = new File([blob], 'metrowalker-result.png', { type: 'image/png' });
 
       const shareText = `MetroWalkerで${selectedLine.name}を歩き切りました！🚶‍♂️✨\n#MetroWalker #東京散歩\n`;
       const shareUrl = window.location.href;
 
-      // 3. スマホのシェア機能に完成した画像をポイッと渡す（サクサク！）
+      // 6. スマホのOSシェア機能に、完成した「写真入り画像」を渡す
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           title: 'MetroWalker',
@@ -381,19 +394,23 @@ export default function App() {
           files: [file],
         });
       } else {
-        // PC等の場合はダウンロードさせる
+        // PC等の場合は画像をダウンロードさせ、テキストをクリップボードにコピー
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = 'metrowalker-result.png';
         a.click();
         URL.revokeObjectURL(url);
+        
         await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
-        alert('画像をダウンロードし、テキストをコピーしました！SNSに貼り付けてシェアしてください。');
+        alert('思い出の詰まった画像をダウンロードしました！SNSに添付してシェアしてください。');
       }
-    } catch (error) {
-      console.error('Share API Error:', error);
-      alert('シェアの準備に失敗しました。');
+    } catch (error: any) {
+      // ユーザーがシェア画面を閉じた（キャンセルした）だけの場合はエラーを出さない
+      if (error.name !== 'AbortError') {
+        console.error('Share API Error:', error);
+        alert('シェア画像の準備中にエラーが発生しました。');
+      }
     } finally {
       setIsGeneratingShare(false);
     }
