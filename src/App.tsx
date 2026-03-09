@@ -977,73 +977,7 @@ export default function App() {
 
       </div> {/* ← ここまでが本来のアプリの枠 */}
 
-      {/* 👇 画像化するための「隠しデザイン（シェアカード）」。枠外に置いてエラーを防ぎます 👇 */}
-      {state === 'SUMMARY' && selectedLine && (
-        <div className="fixed -left-[9999px] -top-[9999px]">
-          <div 
-            ref={shareCardRef} 
-            className="w-[1080px] h-[1080px] bg-neutral-900 p-16 flex flex-col justify-between relative overflow-hidden font-sans"
-          >
-            {/* 背景の装飾 */}
-            <div className="absolute -right-20 -top-20 opacity-10">
-              <MetroLogo className="w-[600px] h-[600px]" />
-            </div>
-
-            {/* ヘッダー */}
-            <div className="flex items-center gap-8 z-10">
-              <div className="w-32 h-32 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg">
-                <Trophy className="w-16 h-16 text-white" />
-              </div>
-              <div>
-                <h2 className="text-7xl font-black text-white tracking-tight">制覇完了！</h2>
-                <p className="text-4xl text-neutral-400 mt-4 font-bold">{selectedLine.name} / 全{totalSteps + 1}駅</p>
-              </div>
-            </div>
-
-            {/* メインの記録 */}
-            <div className="grid grid-cols-2 gap-8 z-10">
-              <div className="bg-white/10 p-10 rounded-3xl backdrop-blur-md">
-                <div className="text-3xl font-bold text-white/50 uppercase tracking-widest mb-4">Total Walk</div>
-                <div className="text-7xl font-black text-white">{totalDistance.toFixed(2)}<span className="text-4xl ml-2 text-white/70">km</span></div>
-              </div>
-              <div className="bg-white/10 p-10 rounded-3xl backdrop-blur-md">
-                <div className="text-3xl font-bold text-white/50 uppercase tracking-widest mb-4">Time</div>
-                <div className="text-7xl font-black text-white">{startTime ? formatTimeMs(Date.now() - startTime) : '--:--'}</div>
-              </div>
-            </div>
-
-            {/* 撮影した写真（最大4枚） */}
-            {history.filter(h => h.photo).length > 0 && (
-              <div className="flex gap-6 z-10">
-                {history.filter(h => h.photo).slice(0, 4).map((item, i) => (
-                  <div key={i} className="w-56 h-56 rounded-3xl overflow-hidden border-4 border-white/20 bg-neutral-800">
-                    <img src={item.photo} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* フッター */}
-            <div className="flex items-end justify-between z-10 border-t-2 border-white/10 pt-10 mt-auto">
-              <div className="flex items-center gap-6">
-                <LineLogo line={selectedLine} size="w-20 h-20" fontSize="text-4xl" />
-                <div>
-                  <div className="text-4xl font-bold text-white">
-                    {selectedLine.stations[startStationIndex]?.name} ➔ {selectedLine.stations[endStationIndex]?.name}
-                  </div>
-                  <div className="text-2xl text-neutral-400 mt-2">Team: {teamName}</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-5xl font-black text-white tracking-tighter">MetroWalker</div>
-                <div className="text-2xl text-neutral-500 font-bold tracking-widest uppercase mt-2">Tokyo Subway Journey</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* 👆 隠しデザインここまで 👆 */}
-
+      
     </div>
   );
 }
