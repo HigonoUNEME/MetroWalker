@@ -329,64 +329,58 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // 画像化してシェアする本格的な機能（エラーハンドリング強化版）
+  // サーバー(Vercel OG)で爆速生成するシェア機能
   const handleShare = async () => {
-    if (!shareCardRef.current || !selectedLine) return;
+    if (!selectedLine) return;
     setIsGeneratingShare(true);
 
     try {
-      // 1. 隠しデザインをキャンバス（画像）に変換
-      const canvas = await html2canvas(shareCardRef.current, {
-        scale: 2, 
-        backgroundColor: '#171717', 
-        width: 1080, // 明示的にサイズを指定してエラーを回避
-        height: 1080,
-        useCORS: true,
+      const timeStr = startTime ? formatTimeMs(Date.now() - startTime) : '--:--';
+      
+      // 1. サーバーに渡す「歩いたデータ」をURL用の文字にまとめる
+      const params = new URLSearchParams({
+        line: selectedLine.name,
+        dist: totalDistance.toFixed(2),
+        time: timeStr,
+        team: teamName,
+        start: selectedLine.stations[startStationIndex]?.name || '',
+        end: selectedLine.stations[endStationIndex]?.name || '',
+        stations: (totalSteps + 1).toString()
       });
 
-      // 2. キャンバスを画像ファイル（Blob）に変換
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          setIsGeneratingShare(false);
-          alert('画像データの作成に失敗しました。');
-          return;
-        }
+      // 2. 先ほど作ったサーバープログラム(api/og.tsx)を呼び出して、画像をダウンロード！
+      const ogUrl = `/api/og?${params.toString()}`;
+      const response = await fetch(ogUrl);
+      if (!response.ok) throw new Error('サーバーでの画像生成に失敗しました');
+      
+      const blob = await response.blob();
+      const file = new File([blob], 'metrowalker-result.png', { type: 'image/png' });
 
-        const file = new File([blob], 'metrowalker-result.png', { type: 'image/png' });
-        const shareText = `MetroWalkerで${selectedLine.name}を歩き切りました！🚶‍♂️✨\n#MetroWalker #東京散歩`;
+      const shareText = `MetroWalkerで${selectedLine.name}を歩き切りました！🚶‍♂️✨\n#MetroWalker #東京散歩\n`;
+      const shareUrl = window.location.href;
 
-        try {
-          // 3. 画像シェアに対応している端末（スマホなど）かチェック
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              title: 'MetroWalker',
-              text: shareText,
-              files: [file],
-            });
-          } else {
-            // PC等、画像直接シェア非対応の場合は画像をダウンロードさせる
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'metrowalker-result.png';
-            a.click();
-            URL.revokeObjectURL(url);
-            alert('結果画像をダウンロードしました！X（Twitter）やLINEに添付してシェアしてください。');
-          }
-        } catch (shareErr: any) {
-          // ★修正ポイント: ユーザーがシェアを途中でキャンセルした場合はエラーアラートを出さない
-          if (shareErr.name !== 'AbortError') {
-            console.error('Share API Error:', shareErr);
-            alert('シェア画面の呼び出しに失敗しました。');
-          }
-        } finally {
-          setIsGeneratingShare(false);
-        }
-      }, 'image/png');
-
+      // 3. スマホのシェア機能に完成した画像をポイッと渡す（サクサク！）
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'MetroWalker',
+          text: shareText + shareUrl,
+          files: [file],
+        });
+      } else {
+        // PC等の場合はダウンロードさせる
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'metrowalker-result.png';
+        a.click();
+        URL.revokeObjectURL(url);
+        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+        alert('画像をダウンロードし、テキストをコピーしました！SNSに貼り付けてシェアしてください。');
+      }
     } catch (error) {
-      console.error('html2canvas Error:', error);
-      alert('画像の生成処理に失敗しました。');
+      console.error('Share API Error:', error);
+      alert('シェアの準備に失敗しました。');
+    } finally {
       setIsGeneratingShare(false);
     }
   };
