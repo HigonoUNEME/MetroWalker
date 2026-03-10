@@ -81,6 +81,7 @@ const TimerDisplay = ({ startTime }: { startTime: number }) => {
   const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
   const seconds = (totalSeconds % 60).toString().padStart(2, '0');
   return (
+    <Analytics />
     <div className="font-mono font-bold text-xl tracking-wider text-neutral-800">
       {hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`}
     </div>
