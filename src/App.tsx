@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Train, 
@@ -81,7 +82,6 @@ const TimerDisplay = ({ startTime }: { startTime: number }) => {
   const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
   const seconds = (totalSeconds % 60).toString().padStart(2, '0');
   return (
-    <Analytics />
     <div className="font-mono font-bold text-xl tracking-wider text-neutral-800">
       {hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`}
     </div>
@@ -431,6 +431,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 font-sans selection:bg-neutral-200">
+      <Analytics />
       <div className="max-w-md mx-auto min-h-screen flex flex-col shadow-xl bg-white relative overflow-hidden">
         
         {/* Header */}
