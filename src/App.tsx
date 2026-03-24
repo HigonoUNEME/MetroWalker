@@ -109,6 +109,7 @@ export default function App() {
   const [endStationIndex, setEndStationIndex] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentQuest, setCurrentQuest] = useState<SanpoQuest | null>(null);
+  const [questAttempt, setQuestAttempt] = useState(0); // 💡 何回目のチェンジかを記憶
   const [history, setHistory] = useState<WalkHistory[]>([]);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [showFoodDialog, setShowFoodDialog] = useState(false);
@@ -175,6 +176,7 @@ export default function App() {
       if (localStorage.getItem('metro-walker-last-time')) setLastStationTime(Number(localStorage.getItem('metro-walker-last-time')));
       if (localStorage.getItem('metro-walker-room-id')) setRoomId(localStorage.getItem('metro-walker-room-id'));
       if (localStorage.getItem('metro-walker-photo')) setCapturedPhoto(localStorage.getItem('metro-walker-photo'));
+      if (localStorage.getItem('metro-walker-attempt')) setQuestAttempt(Number(localStorage.getItem('metro-walker-attempt')));
     }
   }, []);
   
@@ -191,20 +193,21 @@ export default function App() {
     if (startTime) localStorage.setItem('metro-walker-start-time', startTime.toString());
     if (lastStationTime) localStorage.setItem('metro-walker-last-time', lastStationTime.toString());
     if (roomId) localStorage.setItem('metro-walker-room-id', roomId);
+    localStorage.setItem('metro-walker-attempt', questAttempt.toString());
     if (capturedPhoto) localStorage.setItem('metro-walker-photo', capturedPhoto);
     else localStorage.removeItem('metro-walker-photo');
-  }, [state, selectedLine, currentIndex, history, teamName, difficulty, startStationIndex, endStationIndex, startTime, lastStationTime, roomId, capturedPhoto]);
+  }, [state, selectedLine, currentIndex, history, teamName, difficulty, startStationIndex, endStationIndex, startTime, lastStationTime, roomId, capturedPhoto, questAttempt]);
 
-  // 💡 サーバーに現在の状況を送信する関数（状態が変わるたびに呼ぶ）
+  // サーバーに現在の状況を送信する関数
   const pushRoomState = (overrides: any = {}) => {
     if (!roomId) return;
-    const payload = { currentIndex, history, startTime, lastStationTime, capturedPhoto, ...overrides };
+    const payload = { currentIndex, history, startTime, lastStationTime, capturedPhoto, questAttempt, ...overrides };
     fetch(`/api/room/${roomId}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
     }).catch(e => console.error("Sync error", e));
   };
 
-  // 💡 3秒に1回、サーバーの最新状況を確認して同期する関数（リアルタイム同期！）
+  // 💡 自動同期（ポーリング）でチェンジ情報も受け取る
   useEffect(() => {
     if (state !== 'WALKING' || !roomId) return;
     const poll = async () => {
@@ -219,12 +222,19 @@ export default function App() {
               setCurrentIndex(data.currentIndex);
               if (data.lastStationTime) setLastStationTime(data.lastStationTime);
               setCapturedPhoto(data.capturedPhoto || null);
+              setQuestAttempt(data.questAttempt || 0);
               setCurrentQuest(null); // お題を再生成させる
             } 
-            // 誰かが今の駅で写真をアップロードした場合
+            // 今の駅で写真や「チェンジ」があった場合
             else if (data.history && data.history.length === history.length) {
               if (data.capturedPhoto !== capturedPhoto) {
                 setCapturedPhoto(data.capturedPhoto || null);
+              }
+              if (data.questAttempt !== undefined && data.questAttempt !== questAttempt) {
+                setQuestAttempt(data.questAttempt);
+                const isFood = currentQuest?.isFoodMission || false;
+                const current = selectedLine?.stations[data.currentIndex]?.name || "";
+                setCurrentQuest(generateQuestLocal(roomId, current, difficulty, isFood, data.questAttempt));
               }
             }
           }
@@ -233,17 +243,31 @@ export default function App() {
     };
     const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
-  }, [state, roomId, history.length, capturedPhoto]);
+  }, [state, roomId, history.length, capturedPhoto, questAttempt, currentQuest]);
 
-  // オフラインでお題生成
+  // 💡 オフラインでお題生成（attemptを混ぜる）
   useEffect(() => {
-    if (state === 'WALKING' && selectedLine && currentIndex !== endStationIndex) {
+    if (state === 'WALKING' && selectedLine && currentIndex !== endStationIndex && !showFoodDialog) {
       if (currentQuest) return;
       const current = selectedLine.stations[currentIndex]?.name || "";
-      const quest = generateQuestLocal(roomId || "SOLO", current, difficulty, false);
+      const quest = generateQuestLocal(roomId || "SOLO", current, difficulty, false, questAttempt);
       setCurrentQuest(quest);
     }
-  }, [currentIndex, state, endStationIndex, selectedLine, currentQuest, roomId, difficulty]);
+  }, [currentIndex, state, endStationIndex, selectedLine, currentQuest, roomId, difficulty, questAttempt, showFoodDialog]);
+
+  // 💡 チェンジボタンが押された時の処理！
+  const handleChangeQuest = () => {
+    if (!selectedLine) return;
+    const newAttempt = questAttempt + 1; // 試行回数を1増やす
+    setQuestAttempt(newAttempt);
+    
+    const isFood = currentQuest?.isFoodMission || false;
+    const current = selectedLine.stations[currentIndex]?.name || "";
+    const newQuest = generateQuestLocal(roomId || "SOLO", current, difficulty, isFood, newAttempt);
+    
+    setCurrentQuest(newQuest);
+    pushRoomState({ questAttempt: newAttempt }); // サーバーに「チェンジしたよ！」と同期
+  };
 
   const handleSelectLine = (line: MetroLine) => {
     setSelectedLine(line); setStartStationIndex(0); setEndStationIndex(line.stations.length - 1);
@@ -263,7 +287,6 @@ export default function App() {
   };
 
   const handleStartWalk = async () => {
-    // 💡 友達がすでに進めていないかチェック（途中合流機能）
     if (roomId) {
       try {
         const res = await fetch(`/api/room/${roomId}`);
@@ -274,18 +297,16 @@ export default function App() {
           setStartTime(data.startTime);
           setLastStationTime(data.lastStationTime);
           setCapturedPhoto(data.capturedPhoto || null);
+          setQuestAttempt(data.questAttempt || 0);
           setState('WALKING');
           return;
         }
       } catch (e) {}
     }
-
-    // 誰も進めていなければ最初からスタートしてサーバーに保存
     const now = Date.now();
-    setCurrentIndex(startStationIndex); setHistory([]); setCurrentQuest(null);
+    setCurrentIndex(startStationIndex); setHistory([]); setCurrentQuest(null); setQuestAttempt(0);
     setStartTime(now); setLastStationTime(now); setState('WALKING');
-    
-    pushRoomState({ currentIndex: startStationIndex, history: [], startTime: now, lastStationTime: now, capturedPhoto: null });
+    pushRoomState({ currentIndex: startStationIndex, history: [], startTime: now, lastStationTime: now, capturedPhoto: null, questAttempt: 0 });
   };
 
   const handleNextStation = () => {
@@ -305,13 +326,14 @@ export default function App() {
     setHistory(updatedHistory);
     setCapturedPhoto(null);
     setCurrentQuest(null);
+    setQuestAttempt(0); // 💡 次の駅に行ったらチェンジ回数を0にリセット！
 
     if (nextIdx === endStationIndex) {
       setState('SUMMARY');
-      pushRoomState({ currentIndex: nextIdx, history: updatedHistory, capturedPhoto: null });
+      pushRoomState({ currentIndex: nextIdx, history: updatedHistory, capturedPhoto: null, questAttempt: 0 });
     } else {
       setCurrentIndex(nextIdx);
-      pushRoomState({ currentIndex: nextIdx, history: updatedHistory, capturedPhoto: null, lastStationTime: now });
+      pushRoomState({ currentIndex: nextIdx, history: updatedHistory, capturedPhoto: null, lastStationTime: now, questAttempt: 0 });
       const relativeIdx = Math.abs(nextIdx - startStationIndex);
       if (relativeIdx > 0 && relativeIdx % 5 === 0) setShowFoodDialog(true);
     }
@@ -321,7 +343,7 @@ export default function App() {
     setShowFoodDialog(false);
     if (accept && selectedLine && roomId) {
       const current = selectedLine.stations[currentIndex]?.name || "";
-      setCurrentQuest(generateQuestLocal(roomId, current, difficulty, true));
+      setCurrentQuest(generateQuestLocal(roomId, current, difficulty, true, questAttempt));
     }
   };
 
@@ -352,7 +374,7 @@ export default function App() {
             const result = await uploadResponse.json();
             
             setCapturedPhoto(result.url);
-            pushRoomState({ capturedPhoto: result.url }); // 💡 写真を上げたらすぐサーバーに同期！
+            pushRoomState({ capturedPhoto: result.url }); 
           } catch (err) {
             console.error('Upload failed', err);
             alert('写真のアップロードに失敗しました。');
@@ -400,7 +422,7 @@ export default function App() {
 
   const resetApp = () => {
     localStorage.clear();
-    setState('START'); setSelectedLine(null); setCurrentIndex(0); setCurrentQuest(null);
+    setState('START'); setSelectedLine(null); setCurrentIndex(0); setCurrentQuest(null); setQuestAttempt(0);
     setHistory([]); setCapturedPhoto(null); setTeamName(''); setDifficulty('NORMAL');
     setStartTime(null); setLastStationTime(null); setRoomId(null); setShowResetConfirm(false);
     window.history.replaceState({}, '', window.location.pathname);
@@ -629,13 +651,19 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Quest Card */}
+                {/* 💡 Quest Card: チェンジボタンを復活！ */}
                 <div className="relative">
                   <div className="absolute -top-3 left-6 px-3 py-1 bg-neutral-900 text-white text-[10px] font-bold rounded-full uppercase tracking-widest z-10">Sanpo Mission</div>
                   <div className="bg-white border-2 border-neutral-900 rounded-3xl p-6 pt-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)]">
                     {currentQuest ? (
                       <div className="space-y-4">
-                        <div><div className="text-xs font-bold text-neutral-400 mb-1 italic">Theme:</div><h3 className="text-xl font-bold text-neutral-900 leading-tight">{currentQuest.theme}</h3></div>
+                        <div className="flex justify-between items-start">
+                          <div><div className="text-xs font-bold text-neutral-400 mb-1 italic">Theme:</div><h3 className="text-xl font-bold text-neutral-900 leading-tight">{currentQuest.theme}</h3></div>
+                          <button onClick={handleChangeQuest} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-50 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-all border border-neutral-100 active:scale-95">
+                            <RefreshCw className="w-3 h-3 text-neutral-500" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Change</span>
+                          </button>
+                        </div>
                         <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-100"><div className="text-xs font-bold text-neutral-400 mb-2 uppercase tracking-widest">Mission</div><p className="text-neutral-800 font-medium leading-relaxed">{currentQuest.mission}</p></div>
                         <div className="flex gap-3 items-start text-neutral-500"><Info className="w-5 h-5 mt-0.5 flex-shrink-0" /><p className="text-xs leading-relaxed italic">{currentQuest.hint}</p></div>
                       </div>
