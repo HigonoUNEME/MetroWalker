@@ -5,75 +5,74 @@ interface StationLogoProps {
   line: MetroLine;
   stationNumber: string;
   size?: string;
+  // 既存コードとの後方互換のため受け取るが SVG viewBox で比率管理するため使用しない
   fontSize?: string;
   numberFontSize?: string;
 }
 
+/**
+ * 東京メトロ公式ガイドライン P8「駅ナンバリング」準拠
+ *
+ * 公式仕様（viewBox 0 0 100 100 に正規化）:
+ *   外枠リング    : 路線色、strokeWidth ≈ 直径の 9%
+ *   上ゾーン      : 路線記号アルファベット（路線色・極太）
+ *   仕切り線      : 路線色、左右に余白あり
+ *   下ゾーン      : 駅番号 2桁（黒・極太）
+ *
+ * ガイドライン P8 記載の縦比率
+ *   上余白 0.249A / 文字ゾーン 1.073A / 下余白 0.764A
+ * を viewBox 高さ 100 にスケーリングして配置。
+ */
 const StationLogo: React.FC<StationLogoProps> = ({
   line,
   stationNumber,
   size = 'w-14 h-14',
 }) => {
-  // SVGで描画することで、サイズに関わらず正確な比率を維持する
-  // 公式デザイン準拠:
-  //   - 外枠リング: 路線色、stroke幅は直径の約12%
-  //   - 路線記号: 路線色、上半分に配置、Helvetica Neue Bold
-  //   - 仕切り線: 路線色、左右マージンあり
-  //   - 駅番号: 黒、下半分に配置、Helvetica Neue Bold
+  const lineId = line.id.toUpperCase();
 
   return (
     <div className={`${size} flex-shrink-0`}>
       <svg
         viewBox="0 0 100 100"
         xmlns="http://www.w3.org/2000/svg"
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: '100%', display: 'block' }}
+        aria-label={`${lineId}${stationNumber}`}
       >
-        {/* 白背景の円 */}
-        <circle cx="50" cy="50" r="46" fill="white" />
+        {/* 白背景 */}
+        <circle cx="50" cy="50" r="45" fill="#ffffff" />
 
-        {/* 外枠リング（路線色） */}
+        {/* 外枠リング（路線色） — strokeWidth 9 = 直径100の約9% */}
         <circle
           cx="50"
           cy="50"
-          r="46"
+          r="45"
           fill="none"
           stroke={line.color}
-          strokeWidth="8"
+          strokeWidth="9"
         />
 
-        {/* 路線記号（例: G, M, Y）— 路線色、上寄り */}
+        {/* 路線記号（黒）— 公式比率 0.248A */}
         <text
           x="50"
-          y="46"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill={line.color}
-          fontSize="32"
-          fontWeight="900"
-          fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
-          letterSpacing="-1"
-        >
-          {line.id.toUpperCase()}
-        </text>
-
-        {/* 仕切り線（路線色、左右に余白） */}
-        <line
-          x1="22"
-          y1="56"
-          x2="78"
-          y2="56"
-          stroke={line.color}
-          strokeWidth="2"
-        />
-
-        {/* 駅番号（黒、下寄り） */}
-        <text
-          x="50"
-          y="74"
+          y="40"
           textAnchor="middle"
           dominantBaseline="middle"
           fill="#111111"
-          fontSize="26"
+          fontSize="31"
+          fontWeight="900"
+          fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        >
+          {lineId}
+        </text>
+
+        {/* 駅番号（黒）— 公式比率 0.267A、記号よりほんの少し大きい */}
+        <text
+          x="50"
+          y="68"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#111111"
+          fontSize="33"
           fontWeight="900"
           fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
           letterSpacing="1"
