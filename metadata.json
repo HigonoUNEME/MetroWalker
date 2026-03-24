@@ -1,5 +1,5 @@
 {
   "name": "メトロ・ウォーカー・クエスト",
-  "description": "東京メトロの駅間を歩く同期三人のための、AIミッション生成＆記録アプリ。各駅間でGeminiがユニークな「さんぽミッション」を提案します。",
+  "description": "東京メトロを楽しく散歩するためのアプリ。",
   "requestFramePermissions": ["camera"]
 }
