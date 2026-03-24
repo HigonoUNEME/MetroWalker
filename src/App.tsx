@@ -28,6 +28,7 @@ interface WalkHistory {
   timestamp?: number;
 }
 
+// 共通ユーティリティ
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -42,7 +43,8 @@ const formatDMS = (coordinate: number, isLat: boolean): string => {
   const degrees = Math.floor(absolute);
   const minutes = Math.floor((absolute - degrees) * 60);
   const seconds = (((absolute - degrees) * 60 - minutes) * 60).toFixed(1);
-  return `${degrees}°${minutes}'${seconds}"${coordinate >= 0 ? (isLat ? 'N' : 'E') : (isLat ? 'S' : 'W')}`;
+  const direction = coordinate >= 0 ? (isLat ? 'N' : 'E') : (isLat ? 'S' : 'W');
+  return `${degrees}°${minutes}'${seconds}"${direction}`;
 };
 
 const formatTimeMs = (ms: number) => {
@@ -89,16 +91,6 @@ const MetroLogo = ({ className = "" }: { className?: string }) => (
   </div>
 );
 
-const LineLogo = ({ line, size = "w-8 h-8", fontSize = "text-xs" }: { line: MetroLine, size?: string, fontSize?: string }) => (
-  <div className="p-1 inline-block">
-    <div className={`${size} rounded-full flex items-center justify-center relative shadow-sm`} style={{ backgroundColor: line.color }}>
-      <div className="w-1/2 h-1/2 bg-white rounded-full flex items-center justify-center">
-        <span className={`${fontSize} font-bold leading-none text-black`} style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>{line.id}</span>
-      </div>
-    </div>
-  </div>
-);
-
 export default function App() {
   const [state, setState] = useState<AppState>('START');
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -131,8 +123,7 @@ export default function App() {
     let dist = 0;
     const start = Math.min(startStationIndex, endStationIndex);
     const end = Math.max(startStationIndex, endStationIndex);
-    const maxIdx = selectedLine.stations.length - 1;
-    for (let i = Math.max(0, start); i < Math.min(end, maxIdx); i++) {
+    for (let i = start; i < end; i++) {
       const s1 = selectedLine.stations[i], s2 = selectedLine.stations[i + 1];
       if (s1 && s2) dist += calculateDistance(s1.lat, s1.lng, s2.lat, s2.lng);
     }
@@ -152,14 +143,11 @@ export default function App() {
     const savedRoomId = localStorage.getItem('metro-walker-room-id');
 
     if (r) {
-      // 招待URLから来た場合
       const l = params.get('l'), s = params.get('s'), e = params.get('e'), d = params.get('d');
       const line = METRO_LINES.find(x => x.id === l);
       if (line) {
         setSelectedLine(line); setStartStationIndex(Number(s)); setEndStationIndex(Number(e));
         setDifficulty(d as Difficulty); setRoomId(r);
-        
-        // 以前このルームで遊んでいたら復元、そうでなければ合流画面
         if (savedRoomId === r) {
           const savedState = localStorage.getItem('metro-walker-state');
           if (savedState === 'WALKING' || savedState === 'SUMMARY') {
@@ -175,7 +163,6 @@ export default function App() {
         setState('SHARE');
       }
     } else if (savedRoomId) {
-      // PWAなどURLパラメータがない場合の復元
       setRoomId(savedRoomId);
       setState(localStorage.getItem('metro-walker-state') as AppState || 'START');
       setTeamName(localStorage.getItem('metro-walker-team-name') || '');
@@ -191,7 +178,7 @@ export default function App() {
     }
   }, []);
 
-  // 2. スマホへの保存（PWA対策）
+  // 2. スマホへの保存
   useEffect(() => {
     if (!roomId) return;
     localStorage.setItem('metro-walker-room-id', roomId);
@@ -205,52 +192,36 @@ export default function App() {
     localStorage.setItem('metro-walker-history', JSON.stringify(history));
     if (startTime) localStorage.setItem('metro-walker-start-time', startTime.toString());
     localStorage.setItem('metro-walker-attempt', questAttempt.toString());
-  }, [state, currentIndex, history, teamName, startTime, questAttempt, roomId]);
+  }, [state, currentIndex, history, teamName, startTime, questAttempt, roomId, difficulty, selectedLine, startStationIndex, endStationIndex]);
 
-  // 💡 【同期の核】サーバーに今の状況を上書きする関数
+  // 同期関数
   const pushRoomState = (overrides: any = {}) => {
     if (!roomId) return;
-    const payload = { 
-      currentIndex, history, startTime, capturedPhoto, questAttempt, state,
-      ...overrides 
-    };
+    const payload = { currentIndex, history, startTime, capturedPhoto, questAttempt, state, ...overrides };
     fetch(`/api/room/${roomId}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
     }).catch(e => console.error("Sync Error", e));
   };
 
-  // 💡 【同期の核】3秒おきの自動同期チェック
+  // 3秒おきの同期
   useEffect(() => {
     if (state === 'START' || state === 'SETUP' || !roomId) return;
-    
     const poll = async () => {
       try {
         const res = await fetch(`/api/room/${roomId}`);
         if (!res.ok) return;
         const data = await res.json();
         if (data && data.startTime) {
-          // 時間の同期（1秒以上ズレていたら強制修正）
           if (!startTime || Math.abs(startTime - data.startTime) > 1000) setStartTime(data.startTime);
-          
-          // 駅の進捗 ＆ ミッションの同期
           if (data.history && data.history.length > history.length) {
-            setHistory(data.history);
-            setCurrentIndex(data.currentIndex);
-            setCapturedPhoto(data.capturedPhoto || null);
-            setQuestAttempt(data.questAttempt || 0);
-            setCurrentQuest(null); // 次のお題を再計算させる
-          }
-          
-          // 写真の同期（今の駅で誰かがアップした場合）
-          if (data.capturedPhoto !== capturedPhoto) setCapturedPhoto(data.capturedPhoto || null);
-          
-          // チェンジの同期
-          if (data.questAttempt !== undefined && data.questAttempt !== questAttempt) {
-            setQuestAttempt(data.questAttempt);
+            setHistory(data.history); setCurrentIndex(data.currentIndex);
+            setCapturedPhoto(data.capturedPhoto || null); setQuestAttempt(data.questAttempt || 0);
             setCurrentQuest(null);
           }
-          
-          // ゴールの同期
+          if (data.capturedPhoto !== capturedPhoto) setCapturedPhoto(data.capturedPhoto || null);
+          if (data.questAttempt !== undefined && data.questAttempt !== questAttempt) {
+            setQuestAttempt(data.questAttempt); setCurrentQuest(null);
+          }
           if (data.state === 'SUMMARY' && state !== 'SUMMARY') setState('SUMMARY');
         }
       } catch(e) {}
@@ -259,22 +230,20 @@ export default function App() {
     return () => clearInterval(interval);
   }, [state, roomId, history.length, capturedPhoto, startTime, questAttempt]);
 
-  // オフラインでお題生成（ハッシュ方式）
+  // お題生成
   useEffect(() => {
     if (state === 'WALKING' && selectedLine && currentIndex !== endStationIndex && !currentQuest) {
       const current = selectedLine.stations[currentIndex]?.name || "";
       setCurrentQuest(generateQuestLocal(roomId || "SOLO", current, difficulty, false, questAttempt));
     }
-  }, [currentIndex, state, selectedLine, currentQuest, questAttempt, roomId, difficulty]);
+  }, [currentIndex, state, selectedLine, currentQuest, questAttempt, roomId, difficulty, endStationIndex]);
 
   const handleStartWalk = async () => {
     if (!roomId) return;
     let targetTime = Date.now();
     let targetIdx = startStationIndex;
-    let targetHist: WalkHistory[] = [];
+    let targetHist = [];
     let targetAttempt = 0;
-
-    // スタート前にサーバーを見て、誰かが開始済みならそれに合わせる（途中参加）
     try {
       const res = await fetch(`/api/room/${roomId}`);
       const data = await res.json();
@@ -283,10 +252,8 @@ export default function App() {
         targetHist = data.history || []; targetAttempt = data.questAttempt || 0;
       }
     } catch (e) {}
-
     setStartTime(targetTime); setCurrentIndex(targetIdx); setHistory(targetHist); 
     setQuestAttempt(targetAttempt); setState('WALKING');
-    
     pushRoomState({ startTime: targetTime, currentIndex: targetIdx, history: targetHist, questAttempt: targetAttempt, state: 'WALKING' });
   };
 
@@ -294,26 +261,18 @@ export default function App() {
     if (!selectedLine || !currentQuest) return;
     const nextIdx = currentIndex + step;
     const now = Date.now();
-    const newHistoryItem = { 
-      from: selectedLine.stations[currentIndex], to: selectedLine.stations[nextIdx],
-      quest: currentQuest, photo: capturedPhoto || undefined, timestamp: now 
-    };
+    const newHistoryItem = { from: selectedLine.stations[currentIndex], to: selectedLine.stations[nextIdx], quest: currentQuest, photo: capturedPhoto || undefined, timestamp: now };
     const updatedHistory = [...history, newHistoryItem];
-    
     setHistory(updatedHistory); setCapturedPhoto(null); setQuestAttempt(0);
     const isGoal = nextIdx === endStationIndex;
-    const nextState = isGoal ? 'SUMMARY' : 'WALKING';
-    
     if (isGoal) setState('SUMMARY'); else setCurrentIndex(nextIdx);
     setCurrentQuest(null);
-    
-    pushRoomState({ state: nextState, currentIndex: nextIdx, history: updatedHistory, capturedPhoto: null, questAttempt: 0 });
+    pushRoomState({ state: isGoal ? 'SUMMARY' : 'WALKING', currentIndex: nextIdx, history: updatedHistory, capturedPhoto: null, questAttempt: 0 });
   };
 
   const handleChangeQuest = () => {
     const nextAttempt = questAttempt + 1;
-    setQuestAttempt(nextAttempt);
-    setCurrentQuest(null); 
+    setQuestAttempt(nextAttempt); setCurrentQuest(null); 
     pushRoomState({ questAttempt: nextAttempt });
   };
 
@@ -329,32 +288,23 @@ export default function App() {
         const scale = Math.min(1, 800 / img.width);
         canvas.width = img.width * scale; canvas.height = img.height * scale;
         ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
         try {
           const blobData = await (await fetch(canvas.toDataURL('image/jpeg', 0.7))).blob();
           const res = await fetch(`/api/upload?filename=${roomId}-${Date.now()}.jpg`, { method: 'POST', body: blobData });
           const result = await res.json();
-          if (result.url) {
-            setCapturedPhoto(result.url);
-            pushRoomState({ capturedPhoto: result.url });
-          }
-        } catch (err) { alert('写真の保存に失敗しました。Vercel Blobの設定を確認してください。'); }
+          if (result.url) { setCapturedPhoto(result.url); pushRoomState({ capturedPhoto: result.url }); }
+        } catch (err) { alert('写真の保存に失敗しました。'); }
       };
       img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSelectLine = (line: MetroLine) => {
-    setSelectedLine(line); setStartStationIndex(0); setEndStationIndex(line.stations.length - 1);
-    setCurrentIndex(0); setState('SETUP');
-  };
+  const handleSelectLine = (line: MetroLine) => { setSelectedLine(line); setStartStationIndex(0); setEndStationIndex(line.stations.length - 1); setCurrentIndex(0); setState('SETUP'); };
 
   const handleCreateRoom = () => {
     if (!selectedLine) return;
-    if (startStationIndex === endStationIndex) {
-      setSetupError('スタート駅とゴール駅は別の駅にしてください。'); return;
-    }
+    if (startStationIndex === endStationIndex) { setSetupError('スタート駅とゴール駅は別の駅にしてください。'); return; }
     const newRoomId = Math.random().toString(36).substring(2, 6).toUpperCase();
     const newUrl = `${window.location.pathname}?r=${newRoomId}&l=${selectedLine.id}&s=${startStationIndex}&e=${endStationIndex}&d=${difficulty}`;
     window.history.pushState({ path: newUrl }, '', newUrl);
@@ -367,57 +317,42 @@ export default function App() {
     try {
       const timeStr = startTime ? formatTimeMs(Date.now() - startTime) : '--:--';
       const photoUrls = history.filter(item => item.photo).map(item => item.photo).slice(0, 4);
-      const params = new URLSearchParams({
-        line: selectedLine.name, dist: totalDistance.toFixed(2), time: timeStr, team: teamName || 'ゲスト',
-        start: selectedLine.stations[startStationIndex]?.name || '', end: selectedLine.stations[endStationIndex]?.name || '', stations: (totalSteps + 1).toString()
-      });
+      const params = new URLSearchParams({ line: selectedLine.name, dist: totalDistance.toFixed(2), time: timeStr, team: teamName || 'ゲスト', start: selectedLine.stations[startStationIndex]?.name || '', end: selectedLine.stations[endStationIndex]?.name || '', stations: (totalSteps + 1).toString() });
       photoUrls.forEach((url, i) => { if (url) params.append(`p${i + 1}`, url); });
-      const ogUrl = `/api/og?${params.toString()}`;
-      const response = await fetch(ogUrl);
+      const response = await fetch(`/api/og?${params.toString()}`);
       if (!response.ok) throw new Error('画像生成エラー');
       const blob = await response.blob();
       const file = new File([blob], 'metrowalker.png', { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ title: 'MetroWalker', files: [file] });
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'metrowalker.png'; a.click();
-        alert('画像を保存しました。SNSへ投稿してください！');
-      }
-    } catch (e) { alert('シェア画像の準備に失敗しました。'); } finally { setIsGeneratingShare(false); }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ title: 'MetroWalker', files: [file] }); }
+      else { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'metrowalker.png'; a.click(); alert('保存しました。'); }
+    } catch (e) { alert('失敗しました。'); } finally { setIsGeneratingShare(false); }
   };
 
-  const resetApp = () => {
-    localStorage.clear();
-    setState('START'); setSelectedLine(null); setCurrentIndex(0); setCurrentQuest(null); setQuestAttempt(0);
-    setHistory([]); setCapturedPhoto(null); setTeamName(''); setDifficulty('NORMAL');
-    setStartTime(null); setLastStationTime(null); setRoomId(null); setShowResetConfirm(false);
-    window.history.replaceState({}, '', window.location.pathname);
-  };
+  const resetApp = () => { localStorage.clear(); window.location.href = window.location.pathname; };
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900 font-sans selection:bg-neutral-200">
+    <div className="min-h-screen bg-neutral-50 text-neutral-900 font-sans">
       <Analytics />
       <div className="max-w-md mx-auto min-h-screen flex flex-col shadow-xl bg-white relative overflow-hidden">
+        
+        {/* Header: 公式風ロゴを適用 */}
         <header className="p-4 border-b border-neutral-100 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-20">
           <div className="flex items-center gap-2">
             <AnimatePresence mode="wait">
-              {state !== 'START' && (
-                selectedLine ? (
-                  <motion.button key="line-logo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => setShowRouteMap(true)} className="flex items-center gap-2">
-                    <LineLogo line={selectedLine} />
-                    <div className="text-left">
-                      <h1 className="font-bold text-lg leading-none">{selectedLine.name}</h1>
-                      <div className="text-[9px] font-bold text-neutral-400 mt-1 flex items-center gap-1"><Map className="w-3 h-3" /> View Map</div>
-                    </div>
-                  </motion.button>
-                ) : (
-                  <motion.div key="default-logo" className="flex items-center gap-3"><MetroLogo className="w-8" /><h1 className="font-black text-xl tracking-tighter">MetroWalker</h1></motion.div>
-                )
+              {state !== 'START' && selectedLine ? (
+                <motion.button key="line-logo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => setShowRouteMap(true)} className="flex items-center gap-3">
+                  <StationLogo line={selectedLine} stationNumber={selectedLine.id} size="w-10 h-10" />
+                  <div className="text-left">
+                    <h1 className="font-black text-lg leading-none">{selectedLine.name}</h1>
+                    <div className="text-[10px] font-bold text-neutral-400 mt-1 uppercase tracking-widest flex items-center gap-1"><Map className="w-3 h-3" /> View Map</div>
+                  </div>
+                </motion.button>
+              ) : (
+                <div className="flex items-center gap-3"><MetroLogo className="w-8" /><h1 className="font-black text-xl tracking-tighter">MetroWalker</h1></div>
               )}
             </AnimatePresence>
           </div>
-          {state !== 'START' && <button onClick={() => setShowResetConfirm(true)} className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">Reset</button>}
+          {state !== 'START' && <button onClick={() => setShowResetConfirm(true)} className="text-xs font-bold text-neutral-300 uppercase tracking-widest">Reset</button>}
         </header>
 
         {/* Route Map Modal */}
@@ -425,7 +360,10 @@ export default function App() {
           {showRouteMap && selectedLine && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4" onClick={() => setShowRouteMap(false)}>
               <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="bg-white sm:rounded-3xl rounded-t-3xl w-full max-w-md h-[85vh] flex flex-col overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="p-6 border-b border-neutral-100 flex items-center justify-between"><div className="flex items-center gap-3"><LineLogo line={selectedLine} /><div><h3 className="font-bold text-lg">{selectedLine.name}</h3><div className="text-[10px] text-neutral-400">Route Map</div></div></div><button onClick={() => setShowRouteMap(false)} className="p-2 bg-neutral-100 rounded-full"><X className="w-5 h-5" /></button></div>
+                <div className="p-6 border-b flex items-center justify-between">
+                  <div className="flex items-center gap-3"><StationLogo line={selectedLine} stationNumber={selectedLine.id} size="w-10 h-10" /><div><h3 className="font-bold text-lg">{selectedLine.name}</h3><div className="text-[10px] text-neutral-400">Route Map</div></div></div>
+                  <button onClick={() => setShowRouteMap(false)} className="p-2 bg-neutral-100 rounded-full"><X className="w-5 h-5" /></button>
+                </div>
                 <div className="overflow-y-auto p-8 flex-1">
                   <div className="relative border-l-4 ml-4" style={{ borderColor: selectedLine.color }}>
                     {selectedLine.stations.map((station, index) => {
@@ -437,7 +375,6 @@ export default function App() {
                         <div key={index} className={`mb-8 last:mb-0 relative flex items-center pl-8 ${isTarget ? 'opacity-100' : 'opacity-40'}`}>
                           <div className={`absolute -left-[14px] w-6 h-6 rounded-full border-4 border-white transition-all ${isCurrent ? 'scale-150 shadow-lg' : ''}`} style={{ backgroundColor: isCurrent ? '#171717' : isPassed ? selectedLine.color : '#e5e5e5' }} />
                           <div className="flex-1"><div className={`font-bold ${isCurrent ? 'text-xl' : ''}`}>{station.name}</div><div className="text-[10px] font-mono text-neutral-400">{station.reading}</div></div>
-                          {isCurrent && <div className="px-3 py-1 bg-neutral-900 text-white text-[10px] font-bold rounded-full">Current</div>}
                         </div>
                       );
                     })}
@@ -449,7 +386,9 @@ export default function App() {
         </AnimatePresence>
 
         <AnimatePresence>{showResetConfirm && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"><motion.div className="bg-white rounded-3xl p-8 w-full max-w-sm space-y-6 shadow-2xl"><div className="text-center space-y-2"><h3 className="text-2xl font-bold">リセットしますか？</h3><p className="text-neutral-500 text-sm">これまでの記録がすべて消去されます。</p></div><div className="grid gap-3"><button onClick={resetApp} className="w-full bg-red-500 text-white p-4 rounded-2xl font-bold">リセットする</button><button onClick={() => setShowResetConfirm(false)} className="w-full bg-neutral-100 p-4 rounded-2xl font-bold">キャンセル</button></div></motion.div></motion.div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+            <motion.div className="bg-white rounded-3xl p-8 w-full max-w-sm space-y-6 shadow-2xl"><div className="text-center space-y-2"><h3 className="text-2xl font-bold">リセットしますか？</h3><p className="text-neutral-500 text-sm">これまでの記録がすべて消去されます。</p></div><div className="grid gap-3"><button onClick={resetApp} className="w-full bg-red-500 text-white p-4 rounded-2xl font-bold">リセットする</button><button onClick={() => setShowResetConfirm(false)} className="w-full bg-neutral-100 p-4 rounded-2xl font-bold">キャンセル</button></div></motion.div>
+          </motion.div>
         )}</AnimatePresence>
 
         <main className="flex-1 overflow-y-auto pb-24">
@@ -461,7 +400,7 @@ export default function App() {
                   <div className="space-y-2"><label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Team Name</label><input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="w-full p-4 rounded-2xl border bg-neutral-50 font-bold outline-none" placeholder="チーム名を入力" /></div>
                   <div className="space-y-2"><label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Difficulty</label><div className="grid grid-cols-3 gap-2">{(['EASY', 'NORMAL', 'HARD'] as Difficulty[]).map((d) => (<button key={d} onClick={() => setDifficulty(d)} className={`p-3 rounded-xl text-xs font-bold border-2 transition-all ${difficulty === d ? 'bg-neutral-900 border-neutral-900 text-white' : 'bg-white text-neutral-400'}`}>{d}</button>))}</div></div>
                 </div>
-                <div className="space-y-4"><label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Select Line</label><div className="grid gap-3">{METRO_LINES.map((line) => (<button key={line.id} onClick={() => handleSelectLine(line)} className="group flex items-center justify-between p-4 rounded-2xl border bg-white hover:shadow-md transition-all"><div className="flex items-center gap-4"><LineLogo line={line} size="w-10 h-10" fontSize="text-lg" /><div><div className="font-bold text-neutral-800">{line.name}</div><div className="text-xs text-neutral-400">{line.stations.length} 駅</div></div></div><ChevronRight className="w-5 h-5 text-neutral-300" /></button>))}</div></div>
+                <div className="space-y-4"><label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Select Line</label><div className="grid gap-3">{METRO_LINES.map((line) => (<button key={line.id} onClick={() => handleSelectLine(line)} className="group flex items-center justify-between p-4 rounded-2xl border bg-white hover:shadow-md transition-all"><div className="flex items-center gap-4"><StationLogo line={line} stationNumber={line.id} size="w-10 h-10" /><div><div className="font-bold text-neutral-800">{line.name}</div><div className="text-xs text-neutral-400">{line.stations.length} 駅</div></div></div><ChevronRight className="w-5 h-5 text-neutral-300" /></button>))}</div></div>
               </motion.div>
             )}
 
@@ -491,6 +430,7 @@ export default function App() {
 
             {state === 'WALKING' && selectedLine && (
               <motion.div key="walking" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-6">
+                
                 {/* Food Dialog */}
                 <AnimatePresence>{showFoodDialog && (<motion.div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"><motion.div className="bg-white rounded-3xl p-8 w-full max-w-sm space-y-6 shadow-2xl text-center"><UtensilsCrossed className="w-12 h-12 text-amber-600 mx-auto" /><h3 className="text-2xl font-bold">食のミッション！</h3><p className="text-neutral-500 text-sm">特別な食チャレンジに挑戦しますか？</p><div className="grid gap-3"><button onClick={() => { setShowFoodDialog(false); const cur = selectedLine.stations[currentIndex]?.name || ""; setCurrentQuest(generateQuestLocal(roomId!, cur, difficulty, true, 0)); }} className="w-full bg-neutral-900 text-white p-4 rounded-2xl font-bold">チャレンジ！</button><button onClick={() => setShowFoodDialog(false)} className="w-full bg-neutral-100 p-4 rounded-2xl font-bold">パス</button></div></motion.div></motion.div>)}</AnimatePresence>
 
@@ -499,10 +439,32 @@ export default function App() {
                   <div className="h-2 bg-neutral-100 rounded-full overflow-hidden"><motion.div className="h-full" style={{ backgroundColor: selectedLine.color }} initial={{ width: 0 }} animate={{ width: `${((currentStep + 1) / (totalSteps + 1)) * 100}%` }} /></div>
                 </div>
 
-                <div className="flex items-center justify-between bg-neutral-50 p-4 rounded-2xl border relative overflow-hidden">
-                  <div className="text-center flex-1 flex flex-col items-center"><StationLogo line={selectedLine} stationNumber={(currentIndex + 1).toString().padStart(2, '0')} size="w-10 h-10" /><div className="font-bold text-sm mt-1">{selectedLine.stations[currentIndex]?.name}</div></div>
-                  <div className="px-2 flex flex-col items-center gap-1"><ChevronRight className="w-6 h-6 text-neutral-300" /><div className="text-[10px] font-bold text-neutral-400">{distanceToNext.toFixed(2)}km</div></div>
-                  <div className="text-center flex-1 flex flex-col items-center"><StationLogo line={selectedLine} stationNumber={(currentIndex + step + 1).toString().padStart(2, '0')} size="w-10 h-10" /><div className="font-bold text-sm mt-1">{selectedLine.stations[currentIndex + step]?.name}</div></div>
+                {/* 座標を復活させた駅表示セクション */}
+                <div className="flex items-center justify-between bg-neutral-50 p-4 rounded-3xl border border-neutral-100 relative overflow-hidden shadow-sm">
+                  {/* Current Station */}
+                  <div className="text-center flex-1 z-10 flex flex-col items-center">
+                    <div className="text-[10px] font-bold text-neutral-400 uppercase mb-2">Current</div>
+                    <StationLogo line={selectedLine} stationNumber={(currentIndex + 1).toString().padStart(2, '0')} size="w-12 h-12" />
+                    <div className="font-bold text-sm mt-2">{selectedLine.stations[currentIndex]?.name}</div>
+                    <div className="text-[9px] font-mono text-neutral-400 mt-1 bg-white px-2 py-0.5 rounded-full border border-neutral-100">
+                      {selectedLine.stations[currentIndex] ? `${formatDMS(selectedLine.stations[currentIndex].lat, true)}, ${formatDMS(selectedLine.stations[currentIndex].lng, false)}` : ''}
+                    </div>
+                  </div>
+
+                  <div className="px-2 z-10 flex flex-col items-center gap-1">
+                    <ChevronRight className="w-6 h-6 text-neutral-300" />
+                    <div className="text-[10px] font-bold text-neutral-400">{distanceToNext.toFixed(2)}km</div>
+                  </div>
+
+                  {/* Next Station */}
+                  <div className="text-center flex-1 z-10 flex flex-col items-center">
+                    <div className="text-[10px] font-bold text-neutral-400 uppercase mb-2">Next</div>
+                    <StationLogo line={selectedLine} stationNumber={(currentIndex + step + 1).toString().padStart(2, '0')} size="w-12 h-12" />
+                    <div className="font-bold text-sm mt-2">{selectedLine.stations[currentIndex + step]?.name}</div>
+                    <div className="text-[9px] font-mono text-neutral-400 mt-1 bg-white px-2 py-0.5 rounded-full border border-neutral-100">
+                      {selectedLine.stations[currentIndex + step] ? `${formatDMS(selectedLine.stations[currentIndex + step].lat, true)}, ${formatDMS(selectedLine.stations[currentIndex + step].lng, false)}` : ''}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="relative">
