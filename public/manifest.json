@@ -1,7 +1,7 @@
 {
   "name": "メトロ・ウォーカー・クエスト",
   "short_name": "メトロ散歩",
-  "description": "東京メトロの駅間を歩く同期三人のための、AIミッション生成＆記録アプリ。",
+  "description": "東京メトロの駅間を楽しく歩くためのアプリ。",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
