@@ -3,7 +3,7 @@ import { kv } from '@vercel/kv';
 import crypto from 'crypto';
 
 // 💡 Geminiを捨て、ローカルのお題バンクから取得する関数をインポート
-import { getRandomQuest } from './src/missionBank';
+import { generateQuest } from './src/data/stationData';
 
 const app = express();
 app.use(express.json());
