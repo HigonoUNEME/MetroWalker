@@ -4,46 +4,83 @@ import { MetroLine } from '../constants';
 interface StationLogoProps {
   line: MetroLine;
   stationNumber: string;
-  size?: string; // 例: "w-16 h-16"
+  size?: string;
+  fontSize?: string;
+  numberFontSize?: string;
 }
 
-const StationLogo: React.FC<StationLogoProps> = ({ 
-  line, 
-  stationNumber, 
-  size = "w-14 h-14" 
+const StationLogo: React.FC<StationLogoProps> = ({
+  line,
+  stationNumber,
+  size = 'w-14 h-14',
 }) => {
+  // SVGで描画することで、サイズに関わらず正確な比率を維持する
+  // 公式デザイン準拠:
+  //   - 外枠リング: 路線色、stroke幅は直径の約12%
+  //   - 路線記号: 路線色、上半分に配置、Helvetica Neue Bold
+  //   - 仕切り線: 路線色、左右マージンあり
+  //   - 駅番号: 黒、下半分に配置、Helvetica Neue Bold
+
   return (
-    <div className="flex items-center justify-center">
-      {/* 東京メトロ公式駅ナンバリングのデザインを再現:
-        - 外枠: 路線の色の太いリング
-        - 内側: 白背景
-        - 上部: 路線記号 (黒/Bold)
-        - 下部: 駅番号 (黒/Bold)
-        - 中央: 区分け用の細い水平線
-      */}
-      <div 
-        className={`${size} rounded-full border-[5px] bg-white flex flex-col items-center justify-center shadow-sm relative`}
-        style={{ borderColor: line.color }}
+    <div className={`${size} flex-shrink-0`}>
+      <svg
+        viewBox="0 0 100 100"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ width: '100%', height: '100%' }}
       >
-        {/* 路線記号 (M, G, Y など) */}
-        <div 
-          className="text-[140%] font-black leading-none text-black -mb-[2%]"
-          style={{ fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif" }}
+        {/* 白背景の円 */}
+        <circle cx="50" cy="50" r="46" fill="white" />
+
+        {/* 外枠リング（路線色） */}
+        <circle
+          cx="50"
+          cy="50"
+          r="46"
+          fill="none"
+          stroke={line.color}
+          strokeWidth="8"
+        />
+
+        {/* 路線記号（例: G, M, Y）— 路線色、上寄り */}
+        <text
+          x="50"
+          y="46"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill={line.color}
+          fontSize="32"
+          fontWeight="900"
+          fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+          letterSpacing="-1"
         >
-          {line.id}
-        </div>
+          {line.id.toUpperCase()}
+        </text>
 
-        {/* 中央の仕切り線 */}
-        <div className="w-[75%] h-[1.5px] bg-black my-[3%]" />
+        {/* 仕切り線（路線色、左右に余白） */}
+        <line
+          x1="22"
+          y1="56"
+          x2="78"
+          y2="56"
+          stroke={line.color}
+          strokeWidth="2"
+        />
 
-        {/* 駅番号 (01, 15 など) */}
-        <div 
-          className="text-[120%] font-black leading-none text-black"
-          style={{ fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif" }}
+        {/* 駅番号（黒、下寄り） */}
+        <text
+          x="50"
+          y="74"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#111111"
+          fontSize="26"
+          fontWeight="900"
+          fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+          letterSpacing="1"
         >
           {stationNumber}
-        </div>
-      </div>
+        </text>
+      </svg>
     </div>
   );
 };
