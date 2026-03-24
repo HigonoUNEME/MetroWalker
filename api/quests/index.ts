@@ -2,7 +2,7 @@
 import { kv } from '@vercel/kv';
 import crypto from 'crypto';
 // 先ほど作った駅データから関数を読み込む（パスは ../../ になります）
-import { generateQuest } from '../../src/data/stationData';
+import { generateQuest } from '../../src/data/stationData.ts';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
