@@ -26,9 +26,10 @@ import {
 
 import { METRO_LINES, MetroLine, Station } from './constants';
 import { SanpoQuest } from './data/missionBank';
+import { generateQuestLocal } from './data/stationData'; // 💡 新しいローカル関数！
 import StationLogo from './components/StationLogo';
 
-type AppState = 'START' | 'SETUP' | 'WALKING' | 'SUMMARY';
+type AppState = 'START' | 'SETUP' | 'SHARE' | 'WALKING' | 'SUMMARY'; // 💡 SHAREを追加
 type Difficulty = 'EASY' | 'NORMAL' | 'HARD';
 
 interface WalkHistory {
@@ -124,6 +125,7 @@ const LineLogo = ({ line, size = "w-8 h-8", fontSize = "text-xs" }: { line: Metr
 
 export default function App() {
   const [state, setState] = useState<AppState>('START');
+  const [roomId, setRoomId] = useState<string | null>(null); // 💡 ルームID
   const [selectedLine, setSelectedLine] = useState<MetroLine | null>(null);
   const [teamName, setTeamName] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('NORMAL');
@@ -131,7 +133,6 @@ export default function App() {
   const [endStationIndex, setEndStationIndex] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentQuest, setCurrentQuest] = useState<SanpoQuest | null>(null);
-  const [isLoadingQuest, setIsLoadingQuest] = useState(false);
   const [history, setHistory] = useState<WalkHistory[]>([]);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [showFoodDialog, setShowFoodDialog] = useState(false);
@@ -172,8 +173,8 @@ export default function App() {
     return calculateDistance(s1.lat, s1.lng, s2.lat, s2.lng);
   })() : 0;
 
+  // 💡 初期読み込み ＆ Walica式URLの解析
   useEffect(() => {
-    // 基本ステータスの復元
     const savedState = localStorage.getItem('metro-walker-state');
     const savedLineId = localStorage.getItem('metro-walker-line-id');
     const savedTeamName = localStorage.getItem('metro-walker-team-name');
@@ -184,101 +185,94 @@ export default function App() {
     const savedHistory = localStorage.getItem('metro-walker-history');
     const savedStartTime = localStorage.getItem('metro-walker-start-time');
     const savedLastTime = localStorage.getItem('metro-walker-last-time');
-
-    if (savedTeamName) setTeamName(savedTeamName);
-    if (savedDifficulty) setDifficulty(savedDifficulty as Difficulty);
-    if (savedStartIndex) setStartStationIndex(parseInt(savedStartIndex, 10));
-    if (savedEndIndex) setEndStationIndex(parseInt(savedEndIndex, 10));
-    if (savedState) setState(savedState as AppState);
-    if (savedLineId) {
-      const line = METRO_LINES.find(l => l.id === savedLineId);
-      if (line) setSelectedLine(line);
-    }
-    if (savedIndex) setCurrentIndex(parseInt(savedIndex, 10));
-    if (savedHistory) setHistory(JSON.parse(savedHistory));
-    if (savedStartTime) setStartTime(parseInt(savedStartTime, 10));
-    if (savedLastTime) setLastStationTime(parseInt(savedLastTime, 10));
-
-    // 💡【重要】お題の復元（PWA対策 ＆ シェア対応の両立）
-    const params = new URLSearchParams(window.location.search);
-    const urlQid = params.get('qid');
-    const savedQid = localStorage.getItem('metro-walker-qid');
+    const savedRoomId = localStorage.getItem('metro-walker-room-id');
     const savedQuest = localStorage.getItem('metro-walker-quest');
 
-    if (urlQid && savedState === 'WALKING') {
-      // パターンA: 共有URLから開いた、または普通にリロードした時
-      setIsLoadingQuest(true);
-      fetch(`/api/quests/${urlQid}`)
-        .then(res => {
-          if (!res.ok) throw new Error("Quest not found");
-          return res.json();
-        })
-        .then(data => {
-          setCurrentQuest(data);
-          // 自分のスマホにも記憶させておく（PWA対策）
-          localStorage.setItem('metro-walker-quest', JSON.stringify(data));
-          localStorage.setItem('metro-walker-qid', urlQid);
-          setIsLoadingQuest(false);
-        })
-        .catch(err => {
-          console.error("お題の復元に失敗しました", err);
-          setIsLoadingQuest(false);
-        });
+    const params = new URLSearchParams(window.location.search);
+    const r = params.get('r');
 
-    } else if (!urlQid && savedState === 'WALKING' && savedQid && savedQuest) {
-      // パターンB: PWA（ホーム画面）から起動して、URLの qid が消えちゃった時！
-      try {
-        // スマホの記憶から即座に復元し...
-        setCurrentQuest(JSON.parse(savedQuest));
-        // 💡 URLに qid を復活させる（これでいつでもシェア可能！）
-        const newUrl = `${window.location.pathname}?qid=${savedQid}`;
-        window.history.replaceState({ path: newUrl }, '', newUrl);
-      } catch (e) {
-        console.error("ローカルお題の復元失敗", e);
+    if (r) {
+      // 招待URLから来た場合
+      const l = params.get('l');
+      const s = params.get('s');
+      const e = params.get('e');
+      const d = params.get('d');
+      if (l && s && e && d) {
+        const line = METRO_LINES.find(x => x.id === l);
+        if (line) {
+          setSelectedLine(line);
+          setStartStationIndex(Number(s));
+          setEndStationIndex(Number(e));
+          setDifficulty(d as Difficulty);
+          setRoomId(r);
+          if (savedState !== 'WALKING' && savedState !== 'SUMMARY') {
+            setState('SHARE'); // 準備画面で待機
+          } else if (savedState) {
+            setState(savedState as AppState);
+          }
+        }
+      }
+    } else {
+      // 通常の読み込み（PWAなどでURLが消えている時含む）
+      if (savedTeamName) setTeamName(savedTeamName);
+      if (savedDifficulty) setDifficulty(savedDifficulty as Difficulty);
+      if (savedStartIndex) setStartStationIndex(parseInt(savedStartIndex, 10));
+      if (savedEndIndex) setEndStationIndex(parseInt(savedEndIndex, 10));
+      if (savedState) setState(savedState as AppState);
+      if (savedLineId) {
+        const line = METRO_LINES.find(l => l.id === savedLineId);
+        if (line) setSelectedLine(line);
+      }
+      if (savedIndex) setCurrentIndex(parseInt(savedIndex, 10));
+      if (savedHistory) setHistory(JSON.parse(savedHistory));
+      if (savedStartTime) setStartTime(parseInt(savedStartTime, 10));
+      if (savedLastTime) setLastStationTime(parseInt(savedLastTime, 10));
+      if (savedRoomId) setRoomId(savedRoomId);
+      if (savedQuest) {
+        try { setCurrentQuest(JSON.parse(savedQuest)); } catch(e){}
       }
     }
   }, []);
+  
+  // 💡 状態をスマホに強力に保存する（PWA対策）
+  useEffect(() => {
+    localStorage.setItem('metro-walker-state', state);
+    localStorage.setItem('metro-walker-team-name', teamName);
+    localStorage.setItem('metro-walker-difficulty', difficulty);
+    localStorage.setItem('metro-walker-start-index', startStationIndex.toString());
+    localStorage.setItem('metro-walker-end-index', endStationIndex.toString());
+    if (selectedLine) localStorage.setItem('metro-walker-line-id', selectedLine.id);
+    localStorage.setItem('metro-walker-index', currentIndex.toString());
+    localStorage.setItem('metro-walker-history', JSON.stringify(history));
+    if (startTime) localStorage.setItem('metro-walker-start-time', startTime.toString());
+    if (lastStationTime) localStorage.setItem('metro-walker-last-time', lastStationTime.toString());
+    if (roomId) localStorage.setItem('metro-walker-room-id', roomId);
+    if (currentQuest) {
+      localStorage.setItem('metro-walker-quest', JSON.stringify(currentQuest));
+    } else {
+      localStorage.removeItem('metro-walker-quest');
+    }
+  }, [state, selectedLine, currentIndex, history, teamName, difficulty, startStationIndex, endStationIndex, startTime, lastStationTime, roomId, currentQuest]);
 
-  const fetchNextQuest = async (isFoodChallenge: boolean = false) => {
+  // 💡 ローカルで一瞬でお題を生成！（サーバー不要！）
+  useEffect(() => {
+    if (state === 'WALKING' && selectedLine && currentIndex !== endStationIndex) {
+      if (currentQuest) return; // すでにお題を持っていればPWA復元完了
+      fetchNextQuest();
+    }
+  }, [currentIndex, state, endStationIndex, selectedLine, currentQuest]);
+
+  const fetchNextQuest = (isFoodChallenge: boolean = false) => {
     if (!selectedLine) return;
     const nextIdx = currentIndex + step;
     if (nextIdx < 0 || nextIdx >= selectedLine.stations.length) return;
 
-    setIsLoadingQuest(true);
     const current = selectedLine.stations[currentIndex]?.name || "";
-    const next = selectedLine.stations[nextIdx]?.name || "";
-    if (!current || !next) {
-      setIsLoadingQuest(false);
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/quests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentStation: current, nextStation: next, lineName: selectedLine.name, difficulty, isFoodChallenge })
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        
-        // 1. URLを書き換える（シェア用）
-        const newUrl = `${window.location.pathname}?qid=${data.id}`;
-        window.history.pushState({ path: newUrl }, '', newUrl);
-        
-        // 2. 画面にセット
-        setCurrentQuest(data.quest);
-
-        // 3. 💡 PWA対策としてスマホにも記憶させる
-        localStorage.setItem('metro-walker-qid', data.id);
-        localStorage.setItem('metro-walker-quest', JSON.stringify(data.quest));
-      }
-    } catch (err) {
-      console.error("サーバーと通信できませんでした", err);
-    } finally {
-      setIsLoadingQuest(false);
-    }
+    // APIを完全に排除！フロントエンドで計算して1ミリ秒で出します
+    const quest = generateQuestLocal(roomId || "SOLO", current, difficulty, isFoodChallenge);
+    setCurrentQuest(quest);
   };
+
   const handleSelectLine = (line: MetroLine) => {
     setSelectedLine(line);
     setStartStationIndex(0);
@@ -287,19 +281,28 @@ export default function App() {
     setState('SETUP');
   };
 
-  const handleStartWalk = () => {
+  // 💡 Walica式：まずはルームを作る
+  const handleCreateRoom = () => {
     if (!selectedLine) return;
     if (startStationIndex === endStationIndex) {
       setSetupError('スタート駅とゴール駅は別の駅にしてください。');
       return;
     }
 
-    // 【追加】最初からスタートするときもURLを綺麗にする
-    window.history.replaceState({}, '', window.location.pathname);
+    // 新しいルームIDを発行し、URLにパラメータをつける
+    const newRoomId = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const newUrl = `${window.location.pathname}?r=${newRoomId}&l=${selectedLine.id}&s=${startStationIndex}&e=${endStationIndex}&d=${difficulty}`;
+    window.history.pushState({ path: newUrl }, '', newUrl);
 
+    setRoomId(newRoomId);
     setSetupError(null);
+    setState('SHARE'); // ここでシェア画面に移動！
+  };
+
+  const handleStartWalk = () => {
     setCurrentIndex(startStationIndex);
     setHistory([]);
+    setCurrentQuest(null); // トリガーを引いてお題を生成させる
     setStartTime(Date.now());
     setLastStationTime(Date.now());
     setState('WALKING');
@@ -307,11 +310,6 @@ export default function App() {
 
   const handleNextStation = () => {
     if (!selectedLine || !currentQuest) return;
-
-    // 次の駅へ進むのでURLと記憶を綺麗にする
-    window.history.replaceState({}, '', window.location.pathname);
-    localStorage.removeItem('metro-walker-qid');
-    localStorage.removeItem('metro-walker-quest');
 
     const nextIdx = currentIndex + step;
     const fromStation = selectedLine.stations[currentIndex];
@@ -333,6 +331,7 @@ export default function App() {
 
     setHistory([...history, newHistoryItem]);
     setCapturedPhoto(null);
+    setCurrentQuest(null); // 次の駅へ進むため、お題を空にして再生成させる
 
     if (nextIdx === endStationIndex) {
       setState('SUMMARY');
@@ -378,7 +377,6 @@ export default function App() {
           try {
             const response = await fetch(compressedDataUrl);
             const blobData = await response.blob();
-            // 💡 隔離した新しいパスへリクエスト
             const uploadResponse = await fetch(`/api/upload?filename=${Date.now()}.jpg`, {
               method: 'POST',
               body: blobData,
@@ -421,7 +419,6 @@ export default function App() {
         if (url) params.append(`p${i + 1}`, url);
       });
 
-      // 💡 隔離した新しいパスへリクエスト
       const ogUrl = `/api/og?${params.toString()}`;
       const response = await fetch(ogUrl);
       if (!response.ok) throw new Error('サーバーでの画像生成に失敗しました');
@@ -469,8 +466,7 @@ export default function App() {
     localStorage.removeItem('metro-walker-end-index');
     localStorage.removeItem('metro-walker-start-time');
     localStorage.removeItem('metro-walker-last-time');
-    // リセット時にも記憶を消す
-    localStorage.removeItem('metro-walker-qid');
+    localStorage.removeItem('metro-walker-room-id');
     localStorage.removeItem('metro-walker-quest');
     
     setState('START');
@@ -483,7 +479,10 @@ export default function App() {
     setDifficulty('NORMAL');
     setStartTime(null);
     setLastStationTime(null);
+    setRoomId(null);
     setShowResetConfirm(false);
+    
+    window.history.replaceState({}, '', window.location.pathname);
   };
 
   return (
@@ -773,8 +772,44 @@ export default function App() {
                   </div>
                 </div>
 
-                <button onClick={handleStartWalk} className="w-full bg-neutral-900 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 active:scale-95 transition-all">
-                  <span>Start Journey</span>
+                {/* 💡 Walica式：まずはルームを作成するボタンに変更 */}
+                <button onClick={handleCreateRoom} className="w-full bg-neutral-900 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 active:scale-95 transition-all">
+                  <span>ルームを作成する</span>
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </motion.div>
+            )}
+
+            {/* 💡 新設：SHARE STATE (Walica式 待機画面) */}
+            {state === 'SHARE' && selectedLine && (
+              <motion.div key="share" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="p-6 space-y-8">
+                <button onClick={() => setState('SETUP')} className="flex items-center gap-2 text-neutral-400 hover:text-neutral-900 transition-colors">
+                  <ArrowLeft className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase tracking-widest">Back</span>
+                </button>
+
+                <div className="text-center space-y-4 py-8">
+                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Share2 className="w-10 h-10 text-emerald-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold">ルームの準備ができました！</h2>
+                  <p className="text-neutral-500 text-sm">このURLを一緒に歩くメンバーに送って、同じお題に挑戦しましょう。</p>
+                </div>
+
+                <div className="p-4 bg-neutral-50 border border-neutral-100 rounded-2xl flex items-center justify-between gap-4">
+                  <div className="text-xs font-mono text-neutral-500 truncate flex-1">
+                    {window.location.href}
+                  </div>
+                  <button onClick={() => {
+                    navigator.clipboard.writeText(window.location.href);
+                    alert('URLをコピーしました！');
+                  }} className="px-4 py-2 bg-neutral-900 text-white text-xs font-bold rounded-xl whitespace-nowrap active:scale-95 transition-transform">
+                    コピー
+                  </button>
+                </div>
+
+                <button onClick={handleStartWalk} className="w-full bg-neutral-900 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 active:scale-95 transition-all mt-8">
+                  <span>出発する！</span>
                   <ChevronRight className="w-5 h-5" />
                 </button>
               </motion.div>
@@ -870,22 +905,13 @@ export default function App() {
                 <div className="relative">
                   <div className="absolute -top-3 left-6 px-3 py-1 bg-neutral-900 text-white text-[10px] font-bold rounded-full uppercase tracking-widest z-10">Sanpo Mission</div>
                   <div className="bg-white border-2 border-neutral-900 rounded-3xl p-6 pt-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)]">
-                    {isLoadingQuest ? (
-                      <div className="py-12 flex flex-col items-center justify-center gap-4">
-                        <RefreshCw className="w-8 h-8 text-neutral-300 animate-spin" />
-                        <p className="text-sm text-neutral-400 font-medium">ミッションを考案中...</p>
-                      </div>
-                    ) : currentQuest ? (
+                    {currentQuest ? (
                       <div className="space-y-4">
                         <div className="flex justify-between items-start">
                           <div>
                             <div className="text-xs font-bold text-neutral-400 mb-1 italic">Theme:</div>
                             <h3 className="text-xl font-bold text-neutral-900 leading-tight">{currentQuest.theme}</h3>
                           </div>
-                          <button onClick={() => fetchNextQuest(currentQuest.isFoodMission)} disabled={isLoadingQuest} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-50 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-all border border-neutral-100">
-                            <RefreshCw className={`w-3 h-3 ${isLoadingQuest ? 'animate-spin' : ''}`} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider">Change</span>
-                          </button>
                         </div>
                         <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-100">
                           <div className="text-xs font-bold text-neutral-400 mb-2 uppercase tracking-widest">Mission</div>
@@ -897,7 +923,10 @@ export default function App() {
                         </div>
                       </div>
                     ) : (
-                      <div className="py-12 text-center text-neutral-400">ミッションの取得に失敗しました。</div>
+                      <div className="py-12 flex flex-col items-center justify-center gap-4">
+                        <RefreshCw className="w-8 h-8 text-neutral-300 animate-spin" />
+                        <p className="text-sm text-neutral-400 font-medium">ミッションを準備中...</p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -911,7 +940,7 @@ export default function App() {
                     </button>
                     <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} accept="image/*" className="hidden" />
                   </div>
-                  <button onClick={handleNextStation} disabled={isLoadingQuest} className="w-full bg-neutral-900 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 active:scale-95 transition-all disabled:opacity-50">
+                  <button onClick={handleNextStation} className="w-full bg-neutral-900 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 active:scale-95 transition-all">
                     <span>Next Station</span>
                     <ChevronRight className="w-5 h-5" />
                   </button>
