@@ -1,4 +1,4 @@
-import { MISSION_BANK, FOOD_MISSIONS, SanpoQuest } from './missionBank';
+import { MISSION_BANK, FOOD_MISSIONS, SanpoQuest } from './missionBank.ts';
 
 export interface StationSpecialty {
   famous: string[];
