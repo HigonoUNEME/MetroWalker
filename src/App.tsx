@@ -317,6 +317,9 @@ export default function App() {
   const handleNextStation = () => {
     if (!selectedLine || !currentQuest) return;
 
+    // 【追加】次の駅へ進むときは、古いお題のURLを消して綺麗にする
+    window.history.replaceState({}, '', window.location.pathname);
+
     const nextIdx = currentIndex + step;
     const fromStation = selectedLine.stations[currentIndex];
     const toStation = selectedLine.stations[nextIdx];
