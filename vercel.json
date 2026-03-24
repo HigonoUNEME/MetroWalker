@@ -1,12 +1,8 @@
 {
-  "functions": {
-    "server.ts": {
-      "runtime": "nodejs20.x"
-    }
-  },
+  "version": 2,
   "rewrites": [
     {
-      "source": "/api/(.*)",
+      "source": "/api/:path*",
       "destination": "/server.ts"
     }
   ]
