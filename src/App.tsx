@@ -306,6 +306,10 @@ export default function App() {
       setSetupError('スタート駅とゴール駅は別の駅にしてください。');
       return;
     }
+
+    // 【追加】最初からスタートするときもURLを綺麗にする
+    window.history.replaceState({}, '', window.location.pathname);
+
     setSetupError(null);
     setCurrentIndex(startStationIndex);
     setHistory([]);
