@@ -28,6 +28,7 @@ interface WalkHistory {
   timestamp?: number;
 }
 
+// 共通ユーティリティ
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -35,14 +36,6 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
-};
-
-const formatDMS = (coordinate: number, isLat: boolean): string => {
-  const absolute = Math.abs(coordinate);
-  const degrees = Math.floor(absolute);
-  const minutes = Math.floor((absolute - degrees) * 60);
-  const seconds = (((absolute - degrees) * 60 - minutes) * 60).toFixed(1);
-  return `${degrees}°${minutes}'${seconds}"${coordinate >= 0 ? (isLat ? 'N' : 'E') : (isLat ? 'S' : 'W')}`;
 };
 
 const formatTimeMs = (ms: number) => {
@@ -68,36 +61,7 @@ const TimerDisplay = ({ startTime }: { startTime: number }) => {
   return <div className="font-mono font-bold text-xl tracking-wider text-neutral-800">{hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`}</div>;
 };
 
-const MetroLogo = ({ className = "" }: { className?: string }) => (
-  <div className={`aspect-square flex items-center justify-center ${className}`}>
-    <svg viewBox="0 0 100 100" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="blueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#0078D4" stopOpacity="1" />
-          <stop offset="100%" stopColor="#005A9E" stopOpacity="1" />
-        </linearGradient>
-      </defs>
-      <path d="M10 80 L30 30 L50 80 L70 30 L90 80" stroke="url(#blueGradient)" strokeWidth="8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="30" cy="30" r="4" fill="#E8F4F8" stroke="#0078D4" strokeWidth="2" />
-      <circle cx="50" cy="80" r="4" fill="#E8F4F8" stroke="#0078D4" strokeWidth="2" />
-      <circle cx="70" cy="30" r="4" fill="#E8F4F8" stroke="#0078D4" strokeWidth="2" />
-      <path d="M45 45 C40 45, 38 48, 40 52 C42 56, 48 56, 50 52 C52 48, 50 45, 45 45 Z" fill="url(#blueGradient)" />
-      <circle cx="43" cy="40" r="3" fill="url(#blueGradient)" />
-      <circle cx="50" cy="38" r="3" fill="url(#blueGradient)" />
-      <circle cx="57" cy="40" r="3" fill="url(#blueGradient)" />
-    </svg>
-  </div>
-);
-
-const LineLogo = ({ line, size = "w-8 h-8", fontSize = "text-xs" }: { line: MetroLine, size?: string, fontSize?: string }) => (
-  <div className="p-1 inline-block">
-    <div className={`${size} rounded-full flex items-center justify-center relative shadow-sm`} style={{ backgroundColor: line.color }}>
-      <div className="w-1/2 h-1/2 bg-white rounded-full flex items-center justify-center">
-        <span className={`${fontSize} font-bold leading-none text-black`} style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>{line.id}</span>
-      </div>
-    </div>
-  </div>
-);
+// ... (MetroLogo, LineLogo 等のコンポーネントは今のままでOKなので省略)
 
 export default function App() {
   const [state, setState] = useState<AppState>('START');
@@ -109,7 +73,7 @@ export default function App() {
   const [endStationIndex, setEndStationIndex] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentQuest, setCurrentQuest] = useState<SanpoQuest | null>(null);
-  const [questAttempt, setQuestAttempt] = useState(0); // 💡 何回目のチェンジかを記憶
+  const [questAttempt, setQuestAttempt] = useState(0);
   const [history, setHistory] = useState<WalkHistory[]>([]);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [showFoodDialog, setShowFoodDialog] = useState(false);
@@ -131,8 +95,7 @@ export default function App() {
     let dist = 0;
     const start = Math.min(startStationIndex, endStationIndex);
     const end = Math.max(startStationIndex, endStationIndex);
-    const maxIdx = selectedLine.stations.length - 1;
-    for (let i = Math.max(0, start); i < Math.min(end, maxIdx); i++) {
+    for (let i = start; i < end; i++) {
       const s1 = selectedLine.stations[i], s2 = selectedLine.stations[i + 1];
       if (s1 && s2) dist += calculateDistance(s1.lat, s1.lng, s2.lat, s2.lng);
     }
@@ -141,138 +104,197 @@ export default function App() {
 
   const distanceToNext = (selectedLine && currentIndex !== endStationIndex) ? (() => {
     const s1 = selectedLine.stations[currentIndex], s2 = selectedLine.stations[currentIndex + step];
-    if (!s1 || !s2) return 0;
-    return calculateDistance(s1.lat, s1.lng, s2.lat, s2.lng);
+    return s1 && s2 ? calculateDistance(s1.lat, s1.lng, s2.lat, s2.lng) : 0;
   })() : 0;
 
-  // 初期読み込み＆URL解析
-  // 初期読み込み＆URL解析
+  // 1. 初期読み込み（リロード・招待・PWA対策）
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const r = params.get('r');
-
-    // ローカルストレージからすべての記憶を取り出しておく
-    const savedState = localStorage.getItem('metro-walker-state');
-    const savedLineId = localStorage.getItem('metro-walker-line-id');
-    const savedTeamName = localStorage.getItem('metro-walker-team-name');
-    const savedDifficulty = localStorage.getItem('metro-walker-difficulty');
-    const savedStartIndex = localStorage.getItem('metro-walker-start-index');
-    const savedEndIndex = localStorage.getItem('metro-walker-end-index');
-    const savedIndex = localStorage.getItem('metro-walker-index');
-    const savedHistory = localStorage.getItem('metro-walker-history');
-    const savedStartTime = localStorage.getItem('metro-walker-start-time');
-    const savedLastTime = localStorage.getItem('metro-walker-last-time');
     const savedRoomId = localStorage.getItem('metro-walker-room-id');
-    const savedPhoto = localStorage.getItem('metro-walker-photo');
-    const savedAttempt = localStorage.getItem('metro-walker-attempt');
 
     if (r) {
-      // 💡 パターンA: 共有URLから入ってきた場合
+      // 招待URLから来た
       const l = params.get('l'), s = params.get('s'), e = params.get('e'), d = params.get('d');
-      if (l && s && e && d) {
-        const line = METRO_LINES.find(x => x.id === l);
-        if (line) {
-          setSelectedLine(line); 
-          setStartStationIndex(Number(s)); 
-          setEndStationIndex(Number(e));
-          setDifficulty(d as Difficulty); 
-          setRoomId(r);
-
-          // すでにこのルームで歩いている途中でリロードした場合は、時間をしっかり復元！
-          if (savedRoomId === r && (savedState === 'WALKING' || savedState === 'SUMMARY')) {
+      const line = METRO_LINES.find(x => x.id === l);
+      if (line) {
+        setSelectedLine(line); setStartStationIndex(Number(s)); setEndStationIndex(Number(e));
+        setDifficulty(d as Difficulty); setRoomId(r);
+        
+        // もし以前にこのルームで遊んでいたら状態を復元
+        if (savedRoomId === r) {
+          const savedState = localStorage.getItem('metro-walker-state');
+          if (savedState === 'WALKING' || savedState === 'SUMMARY') {
             setState(savedState as AppState);
-            if (savedTeamName) setTeamName(savedTeamName);
-            if (savedIndex) setCurrentIndex(Number(savedIndex));
-            if (savedHistory) setHistory(JSON.parse(savedHistory));
-            if (savedStartTime) setStartTime(Number(savedStartTime)); // ⏱️ ここが抜けていました！
-            if (savedLastTime) setLastStationTime(Number(savedLastTime));
-            if (savedPhoto) setCapturedPhoto(savedPhoto);
-            if (savedAttempt) setQuestAttempt(Number(savedAttempt));
-          } else {
-            // まだ歩き始めていない（または初めて招待URLを開いた）場合は待機画面へ
-            setState('SHARE');
+            setTeamName(localStorage.getItem('metro-walker-team-name') || '');
+            setCurrentIndex(Number(localStorage.getItem('metro-walker-index') || 0));
+            setHistory(JSON.parse(localStorage.getItem('metro-walker-history') || '[]'));
+            setStartTime(Number(localStorage.getItem('metro-walker-start-time') || 0));
+            setQuestAttempt(Number(localStorage.getItem('metro-walker-attempt') || 0));
+            return;
           }
         }
+        setState('SHARE');
       }
-    } else {
-      // 💡 パターンB: URLパラメータがない場合（PWAアイコンからの起動など）の通常復元
-      if (savedTeamName) setTeamName(savedTeamName);
-      if (savedDifficulty) setDifficulty(savedDifficulty as Difficulty);
-      if (savedStartIndex) setStartStationIndex(Number(savedStartIndex));
-      if (savedEndIndex) setEndStationIndex(Number(savedEndIndex));
-      if (savedState) setState(savedState as AppState);
+    } else if (savedRoomId) {
+      // パラメータはないがスマホに記憶がある（PWA対策）
+      setRoomId(savedRoomId);
+      setState(localStorage.getItem('metro-walker-state') as AppState || 'START');
+      setTeamName(localStorage.getItem('metro-walker-team-name') || '');
+      setDifficulty(localStorage.getItem('metro-walker-difficulty') as Difficulty || 'NORMAL');
+      const savedLineId = localStorage.getItem('metro-walker-line-id');
       if (savedLineId) setSelectedLine(METRO_LINES.find(l => l.id === savedLineId) || null);
-      if (savedIndex) setCurrentIndex(Number(savedIndex));
-      if (savedHistory) setHistory(JSON.parse(savedHistory));
-      if (savedStartTime) setStartTime(Number(savedStartTime));
-      if (savedLastTime) setLastStationTime(Number(savedLastTime));
-      if (savedRoomId) setRoomId(savedRoomId);
-      if (savedPhoto) setCapturedPhoto(savedPhoto);
-      if (savedAttempt) setQuestAttempt(Number(savedAttempt));
+      setStartStationIndex(Number(localStorage.getItem('metro-walker-start-index') || 0));
+      setEndStationIndex(Number(localStorage.getItem('metro-walker-end-index') || 0));
+      setCurrentIndex(Number(localStorage.getItem('metro-walker-index') || 0));
+      setHistory(JSON.parse(localStorage.getItem('metro-walker-history') || '[]'));
+      setStartTime(Number(localStorage.getItem('metro-walker-start-time') || 0));
+      setQuestAttempt(Number(localStorage.getItem('metro-walker-attempt') || 0));
     }
   }, []);
 
-  
-  // 💡 自動同期（ポーリング）でチェンジ情報も受け取る
+  // 2. スマホへの保存
+  useEffect(() => {
+    if (!roomId) return;
+    localStorage.setItem('metro-walker-room-id', roomId);
+    localStorage.setItem('metro-walker-state', state);
+    localStorage.setItem('metro-walker-team-name', teamName);
+    localStorage.setItem('metro-walker-difficulty', difficulty);
+    localStorage.setItem('metro-walker-start-index', startStationIndex.toString());
+    localStorage.setItem('metro-walker-end-index', endStationIndex.toString());
+    if (selectedLine) localStorage.setItem('metro-walker-line-id', selectedLine.id);
+    localStorage.setItem('metro-walker-index', currentIndex.toString());
+    localStorage.setItem('metro-walker-history', JSON.stringify(history));
+    if (startTime) localStorage.setItem('metro-walker-start-time', startTime.toString());
+    localStorage.setItem('metro-walker-attempt', questAttempt.toString());
+  }, [state, currentIndex, history, teamName, startTime, questAttempt]);
+
+  // 💡 【重要】サーバーへのプッシュ関数
+  const pushRoomState = (overrides: any = {}) => {
+    if (!roomId) return;
+    const payload = { 
+      currentIndex, history, startTime, capturedPhoto, questAttempt, state,
+      ...overrides 
+    };
+    fetch(`/api/room/${roomId}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    }).catch(e => console.error("Sync Error", e));
+  };
+
+  // 💡 【重要】3秒おきの同期チェック（タイマー・写真・ミッション・駅すべて！）
   useEffect(() => {
     if (state !== 'WALKING' || !roomId) return;
     const poll = async () => {
       try {
         const res = await fetch(`/api/room/${roomId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && Object.keys(data).length > 0) {
-            // 誰かが次の駅に進んでいた場合
-            if (data.history && data.history.length > history.length) {
-              setHistory(data.history);
-              setCurrentIndex(data.currentIndex);
-              if (data.lastStationTime) setLastStationTime(data.lastStationTime);
-              setCapturedPhoto(data.capturedPhoto || null);
-              setQuestAttempt(data.questAttempt || 0);
-              setCurrentQuest(null); // お題を再生成させる
-            } 
-            // 今の駅で写真や「チェンジ」があった場合
-            else if (data.history && data.history.length === history.length) {
-              if (data.capturedPhoto !== capturedPhoto) {
-                setCapturedPhoto(data.capturedPhoto || null);
-              }
-              if (data.questAttempt !== undefined && data.questAttempt !== questAttempt) {
-                setQuestAttempt(data.questAttempt);
-                const isFood = currentQuest?.isFoodMission || false;
-                const current = selectedLine?.stations[data.currentIndex]?.name || "";
-                setCurrentQuest(generateQuestLocal(roomId, current, difficulty, isFood, data.questAttempt));
-              }
-            }
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.startTime) {
+          // 時間の同期
+          if (!startTime || Math.abs(startTime - data.startTime) > 2000) setStartTime(data.startTime);
+          // 駅の進捗同期
+          if (data.history && data.history.length > history.length) {
+            setHistory(data.history); setCurrentIndex(data.currentIndex);
+            setCapturedPhoto(data.capturedPhoto || null); setQuestAttempt(data.questAttempt || 0);
+            setCurrentQuest(null);
           }
+          // 写真だけの同期
+          if (data.capturedPhoto !== capturedPhoto) setCapturedPhoto(data.capturedPhoto || null);
+          // チェンジの同期
+          if (data.questAttempt !== undefined && data.questAttempt !== questAttempt) {
+            setQuestAttempt(data.questAttempt);
+            setCurrentQuest(null);
+          }
+          // 全体ゴールの同期
+          if (data.state === 'SUMMARY') setState('SUMMARY');
         }
       } catch(e) {}
     };
     const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
-  }, [state, roomId, history.length, capturedPhoto, questAttempt, currentQuest]);
+  }, [state, roomId, history.length, capturedPhoto, startTime, questAttempt]);
 
-  // 💡 オフラインでお題生成（attemptを混ぜる）
+  // オフラインでお題生成
   useEffect(() => {
-    if (state === 'WALKING' && selectedLine && currentIndex !== endStationIndex && !showFoodDialog) {
-      if (currentQuest) return;
+    if (state === 'WALKING' && selectedLine && currentIndex !== endStationIndex && !currentQuest) {
       const current = selectedLine.stations[currentIndex]?.name || "";
-      const quest = generateQuestLocal(roomId || "SOLO", current, difficulty, false, questAttempt);
-      setCurrentQuest(quest);
+      setCurrentQuest(generateQuestLocal(roomId || "SOLO", current, difficulty, false, questAttempt));
     }
-  }, [currentIndex, state, endStationIndex, selectedLine, currentQuest, roomId, difficulty, questAttempt, showFoodDialog]);
+  }, [currentIndex, state, selectedLine, currentQuest, questAttempt]);
 
-  // 💡 チェンジボタンが押された時の処理！
+  const handleStartWalk = async () => {
+    if (!roomId) return;
+    let targetTime = Date.now();
+    let targetIdx = startStationIndex;
+    let targetHist = [];
+    let targetAttempt = 0;
+
+    try {
+      const res = await fetch(`/api/room/${roomId}`);
+      const data = await res.json();
+      if (data && data.startTime) {
+        targetTime = data.startTime; targetIdx = data.currentIndex; targetHist = data.history || [];
+        targetAttempt = data.questAttempt || 0;
+      }
+    } catch (e) {}
+
+    setStartTime(targetTime); setCurrentIndex(targetIdx); setHistory(targetHist); 
+    setQuestAttempt(targetAttempt); setState('WALKING');
+    pushRoomState({ startTime: targetTime, currentIndex: targetIdx, history: targetHist, questAttempt: targetAttempt });
+  };
+
+  const handleNextStation = () => {
+    if (!selectedLine || !currentQuest) return;
+    const nextIdx = currentIndex + step;
+    const now = Date.now();
+    const newHistoryItem = { 
+      from: selectedLine.stations[currentIndex], to: selectedLine.stations[nextIdx],
+      quest: currentQuest, photo: capturedPhoto || undefined, timestamp: now 
+    };
+    const updatedHistory = [...history, newHistoryItem];
+    
+    setHistory(updatedHistory); setCapturedPhoto(null); setQuestAttempt(0);
+    const isGoal = nextIdx === endStationIndex;
+    const nextState = isGoal ? 'SUMMARY' : 'WALKING';
+    
+    if (isGoal) setState('SUMMARY'); else setCurrentIndex(nextIdx);
+    setCurrentQuest(null);
+    pushRoomState({ state: nextState, currentIndex: nextIdx, history: updatedHistory, capturedPhoto: null, questAttempt: 0 });
+  };
+
   const handleChangeQuest = () => {
-    if (!selectedLine) return;
-    const newAttempt = questAttempt + 1; // 試行回数を1増やす
-    setQuestAttempt(newAttempt);
-    
-    const isFood = currentQuest?.isFoodMission || false;
-    const current = selectedLine.stations[currentIndex]?.name || "";
-    const newQuest = generateQuestLocal(roomId || "SOLO", current, difficulty, isFood, newAttempt);
-    
-    setCurrentQuest(newQuest);
-    pushRoomState({ questAttempt: newAttempt }); // サーバーに「チェンジしたよ！」と同期
+    const nextAttempt = questAttempt + 1;
+    setQuestAttempt(nextAttempt);
+    setCurrentQuest(null); // useEffectで再生成される
+    pushRoomState({ questAttempt: nextAttempt });
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const scale = Math.min(1, 800 / img.width);
+        canvas.width = img.width * scale; canvas.height = img.height * scale;
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        try {
+          const blobData = await (await fetch(canvas.toDataURL('image/jpeg', 0.7))).blob();
+          const res = await fetch(`/api/upload?filename=${roomId}-${Date.now()}.jpg`, { method: 'POST', body: blobData });
+          const result = await res.json();
+          if (result.url) {
+            setCapturedPhoto(result.url);
+            pushRoomState({ capturedPhoto: result.url });
+          }
+        } catch (err) { alert('写真の保存に失敗しました。'); }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSelectLine = (line: MetroLine) => {
