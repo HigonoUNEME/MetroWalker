@@ -7,29 +7,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Train, 
-  MapPin, 
-  Camera, 
-  ChevronRight, 
-  RefreshCw, 
-  CheckCircle2, 
-  Trophy,
-  Info,
-  ArrowLeft, 
-  Share2, 
-  UtensilsCrossed, 
-  Clock, 
-  Map, 
-  Loader2, 
-  X
+  Train, MapPin, Camera, ChevronRight, RefreshCw, CheckCircle2, Trophy,
+  Info, ArrowLeft, Share2, UtensilsCrossed, Clock, Map, Loader2, X
 } from 'lucide-react';
 
 import { METRO_LINES, MetroLine, Station } from './constants';
 import { SanpoQuest } from './data/missionBank';
-import { generateQuestLocal } from './data/stationData'; // 💡 新しいローカル関数！
+import { generateQuestLocal } from './data/stationData';
 import StationLogo from './components/StationLogo';
 
-type AppState = 'START' | 'SETUP' | 'SHARE' | 'WALKING' | 'SUMMARY'; // 💡 SHAREを追加
+type AppState = 'START' | 'SETUP' | 'SHARE' | 'WALKING' | 'SUMMARY';
 type Difficulty = 'EASY' | 'NORMAL' | 'HARD';
 
 interface WalkHistory {
@@ -41,14 +28,11 @@ interface WalkHistory {
   timestamp?: number;
 }
 
-
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
@@ -56,11 +40,9 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 const formatDMS = (coordinate: number, isLat: boolean): string => {
   const absolute = Math.abs(coordinate);
   const degrees = Math.floor(absolute);
-  const minutesNotTruncated = (absolute - degrees) * 60;
-  const minutes = Math.floor(minutesNotTruncated);
-  const seconds = ((minutesNotTruncated - minutes) * 60).toFixed(1);
-  const direction = coordinate >= 0 ? (isLat ? 'N' : 'E') : (isLat ? 'S' : 'W');
-  return `${degrees}°${minutes}'${seconds}"${direction}`;
+  const minutes = Math.floor((absolute - degrees) * 60);
+  const seconds = (((absolute - degrees) * 60 - minutes) * 60).toFixed(1);
+  return `${degrees}°${minutes}'${seconds}"${coordinate >= 0 ? (isLat ? 'N' : 'E') : (isLat ? 'S' : 'W')}`;
 };
 
 const formatTimeMs = (ms: number) => {
@@ -83,11 +65,7 @@ const TimerDisplay = ({ startTime }: { startTime: number }) => {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
   const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  return (
-    <div className="font-mono font-bold text-xl tracking-wider text-neutral-800">
-      {hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`}
-    </div>
-  );
+  return <div className="font-mono font-bold text-xl tracking-wider text-neutral-800">{hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`}</div>;
 };
 
 const MetroLogo = ({ className = "" }: { className?: string }) => (
@@ -115,9 +93,7 @@ const LineLogo = ({ line, size = "w-8 h-8", fontSize = "text-xs" }: { line: Metr
   <div className="p-1 inline-block">
     <div className={`${size} rounded-full flex items-center justify-center relative shadow-sm`} style={{ backgroundColor: line.color }}>
       <div className="w-1/2 h-1/2 bg-white rounded-full flex items-center justify-center">
-        <span className={`${fontSize} font-bold leading-none text-black`} style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-          {line.id}
-        </span>
+        <span className={`${fontSize} font-bold leading-none text-black`} style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>{line.id}</span>
       </div>
     </div>
   </div>
@@ -125,7 +101,7 @@ const LineLogo = ({ line, size = "w-8 h-8", fontSize = "text-xs" }: { line: Metr
 
 export default function App() {
   const [state, setState] = useState<AppState>('START');
-  const [roomId, setRoomId] = useState<string | null>(null); // 💡 ルームID
+  const [roomId, setRoomId] = useState<string | null>(null);
   const [selectedLine, setSelectedLine] = useState<MetroLine | null>(null);
   const [teamName, setTeamName] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('NORMAL');
@@ -138,7 +114,6 @@ export default function App() {
   const [showFoodDialog, setShowFoodDialog] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
-  
   const [startTime, setStartTime] = useState<number | null>(null);
   const [lastStationTime, setLastStationTime] = useState<number | null>(null);
   const [showRouteMap, setShowRouteMap] = useState(false);
@@ -156,85 +131,54 @@ export default function App() {
     const start = Math.min(startStationIndex, endStationIndex);
     const end = Math.max(startStationIndex, endStationIndex);
     const maxIdx = selectedLine.stations.length - 1;
-    const safeStart = Math.max(0, Math.min(start, maxIdx));
-    const safeEnd = Math.max(0, Math.min(end, maxIdx));
-    for (let i = safeStart; i < safeEnd; i++) {
-      const s1 = selectedLine.stations[i];
-      const s2 = selectedLine.stations[i + 1];
+    for (let i = Math.max(0, start); i < Math.min(end, maxIdx); i++) {
+      const s1 = selectedLine.stations[i], s2 = selectedLine.stations[i + 1];
       if (s1 && s2) dist += calculateDistance(s1.lat, s1.lng, s2.lat, s2.lng);
     }
     return dist;
   })() : 0;
 
   const distanceToNext = (selectedLine && currentIndex !== endStationIndex) ? (() => {
-    const s1 = selectedLine.stations[currentIndex];
-    const s2 = selectedLine.stations[currentIndex + step];
+    const s1 = selectedLine.stations[currentIndex], s2 = selectedLine.stations[currentIndex + step];
     if (!s1 || !s2) return 0;
     return calculateDistance(s1.lat, s1.lng, s2.lat, s2.lng);
   })() : 0;
 
-  // 💡 初期読み込み ＆ Walica式URLの解析
+  // 初期読み込み＆URL解析
   useEffect(() => {
-    const savedState = localStorage.getItem('metro-walker-state');
-    const savedLineId = localStorage.getItem('metro-walker-line-id');
-    const savedTeamName = localStorage.getItem('metro-walker-team-name');
-    const savedDifficulty = localStorage.getItem('metro-walker-difficulty');
-    const savedStartIndex = localStorage.getItem('metro-walker-start-index');
-    const savedEndIndex = localStorage.getItem('metro-walker-end-index');
-    const savedIndex = localStorage.getItem('metro-walker-index');
-    const savedHistory = localStorage.getItem('metro-walker-history');
-    const savedStartTime = localStorage.getItem('metro-walker-start-time');
-    const savedLastTime = localStorage.getItem('metro-walker-last-time');
-    const savedRoomId = localStorage.getItem('metro-walker-room-id');
-    const savedQuest = localStorage.getItem('metro-walker-quest');
-
     const params = new URLSearchParams(window.location.search);
     const r = params.get('r');
 
     if (r) {
-      // 招待URLから来た場合
-      const l = params.get('l');
-      const s = params.get('s');
-      const e = params.get('e');
-      const d = params.get('d');
+      const l = params.get('l'), s = params.get('s'), e = params.get('e'), d = params.get('d');
       if (l && s && e && d) {
         const line = METRO_LINES.find(x => x.id === l);
         if (line) {
-          setSelectedLine(line);
-          setStartStationIndex(Number(s));
-          setEndStationIndex(Number(e));
-          setDifficulty(d as Difficulty);
-          setRoomId(r);
-          if (savedState !== 'WALKING' && savedState !== 'SUMMARY') {
-            setState('SHARE'); // 準備画面で待機
-          } else if (savedState) {
-            setState(savedState as AppState);
-          }
+          setSelectedLine(line); setStartStationIndex(Number(s)); setEndStationIndex(Number(e));
+          setDifficulty(d as Difficulty); setRoomId(r);
+          const savedState = localStorage.getItem('metro-walker-state');
+          if (savedState !== 'WALKING' && savedState !== 'SUMMARY') setState('SHARE');
+          else setState(savedState as AppState);
         }
       }
     } else {
-      // 通常の読み込み（PWAなどでURLが消えている時含む）
-      if (savedTeamName) setTeamName(savedTeamName);
-      if (savedDifficulty) setDifficulty(savedDifficulty as Difficulty);
-      if (savedStartIndex) setStartStationIndex(parseInt(savedStartIndex, 10));
-      if (savedEndIndex) setEndStationIndex(parseInt(savedEndIndex, 10));
-      if (savedState) setState(savedState as AppState);
-      if (savedLineId) {
-        const line = METRO_LINES.find(l => l.id === savedLineId);
-        if (line) setSelectedLine(line);
-      }
-      if (savedIndex) setCurrentIndex(parseInt(savedIndex, 10));
-      if (savedHistory) setHistory(JSON.parse(savedHistory));
-      if (savedStartTime) setStartTime(parseInt(savedStartTime, 10));
-      if (savedLastTime) setLastStationTime(parseInt(savedLastTime, 10));
-      if (savedRoomId) setRoomId(savedRoomId);
-      if (savedQuest) {
-        try { setCurrentQuest(JSON.parse(savedQuest)); } catch(e){}
-      }
+      if (localStorage.getItem('metro-walker-team-name')) setTeamName(localStorage.getItem('metro-walker-team-name')!);
+      if (localStorage.getItem('metro-walker-difficulty')) setDifficulty(localStorage.getItem('metro-walker-difficulty') as Difficulty);
+      if (localStorage.getItem('metro-walker-start-index')) setStartStationIndex(Number(localStorage.getItem('metro-walker-start-index')));
+      if (localStorage.getItem('metro-walker-end-index')) setEndStationIndex(Number(localStorage.getItem('metro-walker-end-index')));
+      if (localStorage.getItem('metro-walker-state')) setState(localStorage.getItem('metro-walker-state') as AppState);
+      const savedLineId = localStorage.getItem('metro-walker-line-id');
+      if (savedLineId) setSelectedLine(METRO_LINES.find(l => l.id === savedLineId) || null);
+      if (localStorage.getItem('metro-walker-index')) setCurrentIndex(Number(localStorage.getItem('metro-walker-index')));
+      if (localStorage.getItem('metro-walker-history')) setHistory(JSON.parse(localStorage.getItem('metro-walker-history')!));
+      if (localStorage.getItem('metro-walker-start-time')) setStartTime(Number(localStorage.getItem('metro-walker-start-time')));
+      if (localStorage.getItem('metro-walker-last-time')) setLastStationTime(Number(localStorage.getItem('metro-walker-last-time')));
+      if (localStorage.getItem('metro-walker-room-id')) setRoomId(localStorage.getItem('metro-walker-room-id'));
+      if (localStorage.getItem('metro-walker-photo')) setCapturedPhoto(localStorage.getItem('metro-walker-photo'));
     }
   }, []);
   
-  // 💡 状態をスマホに強力に保存する（PWA対策）
+  // スマホへ強力保存
   useEffect(() => {
     localStorage.setItem('metro-walker-state', state);
     localStorage.setItem('metro-walker-team-name', teamName);
@@ -247,106 +191,138 @@ export default function App() {
     if (startTime) localStorage.setItem('metro-walker-start-time', startTime.toString());
     if (lastStationTime) localStorage.setItem('metro-walker-last-time', lastStationTime.toString());
     if (roomId) localStorage.setItem('metro-walker-room-id', roomId);
-    if (currentQuest) {
-      localStorage.setItem('metro-walker-quest', JSON.stringify(currentQuest));
-    } else {
-      localStorage.removeItem('metro-walker-quest');
-    }
-  }, [state, selectedLine, currentIndex, history, teamName, difficulty, startStationIndex, endStationIndex, startTime, lastStationTime, roomId, currentQuest]);
+    if (capturedPhoto) localStorage.setItem('metro-walker-photo', capturedPhoto);
+    else localStorage.removeItem('metro-walker-photo');
+  }, [state, selectedLine, currentIndex, history, teamName, difficulty, startStationIndex, endStationIndex, startTime, lastStationTime, roomId, capturedPhoto]);
 
-  // 💡 ローカルで一瞬でお題を生成！（サーバー不要！）
+  // 💡 サーバーに現在の状況を送信する関数（状態が変わるたびに呼ぶ）
+  const pushRoomState = (overrides: any = {}) => {
+    if (!roomId) return;
+    const payload = { currentIndex, history, startTime, lastStationTime, capturedPhoto, ...overrides };
+    fetch(`/api/room/${roomId}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    }).catch(e => console.error("Sync error", e));
+  };
+
+  // 💡 3秒に1回、サーバーの最新状況を確認して同期する関数（リアルタイム同期！）
+  useEffect(() => {
+    if (state !== 'WALKING' || !roomId) return;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/room/${roomId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Object.keys(data).length > 0) {
+            // 誰かが次の駅に進んでいた場合
+            if (data.history && data.history.length > history.length) {
+              setHistory(data.history);
+              setCurrentIndex(data.currentIndex);
+              if (data.lastStationTime) setLastStationTime(data.lastStationTime);
+              setCapturedPhoto(data.capturedPhoto || null);
+              setCurrentQuest(null); // お題を再生成させる
+            } 
+            // 誰かが今の駅で写真をアップロードした場合
+            else if (data.history && data.history.length === history.length) {
+              if (data.capturedPhoto !== capturedPhoto) {
+                setCapturedPhoto(data.capturedPhoto || null);
+              }
+            }
+          }
+        }
+      } catch(e) {}
+    };
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  }, [state, roomId, history.length, capturedPhoto]);
+
+  // オフラインでお題生成
   useEffect(() => {
     if (state === 'WALKING' && selectedLine && currentIndex !== endStationIndex) {
-      if (currentQuest) return; // すでにお題を持っていればPWA復元完了
-      fetchNextQuest();
+      if (currentQuest) return;
+      const current = selectedLine.stations[currentIndex]?.name || "";
+      const quest = generateQuestLocal(roomId || "SOLO", current, difficulty, false);
+      setCurrentQuest(quest);
     }
-  }, [currentIndex, state, endStationIndex, selectedLine, currentQuest]);
-
-  const fetchNextQuest = (isFoodChallenge: boolean = false) => {
-    if (!selectedLine) return;
-    const nextIdx = currentIndex + step;
-    if (nextIdx < 0 || nextIdx >= selectedLine.stations.length) return;
-
-    const current = selectedLine.stations[currentIndex]?.name || "";
-    // APIを完全に排除！フロントエンドで計算して1ミリ秒で出します
-    const quest = generateQuestLocal(roomId || "SOLO", current, difficulty, isFoodChallenge);
-    setCurrentQuest(quest);
-  };
+  }, [currentIndex, state, endStationIndex, selectedLine, currentQuest, roomId, difficulty]);
 
   const handleSelectLine = (line: MetroLine) => {
-    setSelectedLine(line);
-    setStartStationIndex(0);
-    setEndStationIndex(line.stations.length - 1);
-    setCurrentIndex(0);
-    setState('SETUP');
+    setSelectedLine(line); setStartStationIndex(0); setEndStationIndex(line.stations.length - 1);
+    setCurrentIndex(0); setState('SETUP');
   };
 
-  // 💡 Walica式：まずはルームを作る
   const handleCreateRoom = () => {
     if (!selectedLine) return;
     if (startStationIndex === endStationIndex) {
-      setSetupError('スタート駅とゴール駅は別の駅にしてください。');
-      return;
+      setSetupError('スタート駅とゴール駅は別の駅にしてください。'); return;
     }
-
-    // 新しいルームIDを発行し、URLにパラメータをつける
     const newRoomId = Math.random().toString(36).substring(2, 6).toUpperCase();
     const newUrl = `${window.location.pathname}?r=${newRoomId}&l=${selectedLine.id}&s=${startStationIndex}&e=${endStationIndex}&d=${difficulty}`;
     window.history.pushState({ path: newUrl }, '', newUrl);
 
-    setRoomId(newRoomId);
-    setSetupError(null);
-    setState('SHARE'); // ここでシェア画面に移動！
+    setRoomId(newRoomId); setSetupError(null); setState('SHARE');
   };
 
-  const handleStartWalk = () => {
-    setCurrentIndex(startStationIndex);
-    setHistory([]);
-    setCurrentQuest(null); // トリガーを引いてお題を生成させる
-    setStartTime(Date.now());
-    setLastStationTime(Date.now());
-    setState('WALKING');
+  const handleStartWalk = async () => {
+    // 💡 友達がすでに進めていないかチェック（途中合流機能）
+    if (roomId) {
+      try {
+        const res = await fetch(`/api/room/${roomId}`);
+        const data = await res.json();
+        if (data && data.startTime) {
+          setCurrentIndex(data.currentIndex);
+          setHistory(data.history || []);
+          setStartTime(data.startTime);
+          setLastStationTime(data.lastStationTime);
+          setCapturedPhoto(data.capturedPhoto || null);
+          setState('WALKING');
+          return;
+        }
+      } catch (e) {}
+    }
+
+    // 誰も進めていなければ最初からスタートしてサーバーに保存
+    const now = Date.now();
+    setCurrentIndex(startStationIndex); setHistory([]); setCurrentQuest(null);
+    setStartTime(now); setLastStationTime(now); setState('WALKING');
+    
+    pushRoomState({ currentIndex: startStationIndex, history: [], startTime: now, lastStationTime: now, capturedPhoto: null });
   };
 
   const handleNextStation = () => {
     if (!selectedLine || !currentQuest) return;
 
     const nextIdx = currentIndex + step;
-    const fromStation = selectedLine.stations[currentIndex];
-    const toStation = selectedLine.stations[nextIdx];
+    const fromStation = selectedLine.stations[currentIndex], toStation = selectedLine.stations[nextIdx];
     if (!fromStation || !toStation) return;
 
     const now = Date.now();
     const timeTakenMs = lastStationTime ? now - lastStationTime : 0;
     setLastStationTime(now);
 
-    const newHistoryItem: WalkHistory = {
-      from: fromStation,
-      to: toStation,
-      quest: currentQuest,
-      photo: capturedPhoto || undefined,
-      timeTakenMs: timeTakenMs,
-      timestamp: now,
-    };
+    const newHistoryItem: WalkHistory = { from: fromStation, to: toStation, quest: currentQuest, photo: capturedPhoto || undefined, timeTakenMs, timestamp: now };
+    const updatedHistory = [...history, newHistoryItem];
 
-    setHistory([...history, newHistoryItem]);
+    setHistory(updatedHistory);
     setCapturedPhoto(null);
-    setCurrentQuest(null); // 次の駅へ進むため、お題を空にして再生成させる
+    setCurrentQuest(null);
 
     if (nextIdx === endStationIndex) {
       setState('SUMMARY');
+      pushRoomState({ currentIndex: nextIdx, history: updatedHistory, capturedPhoto: null });
     } else {
       setCurrentIndex(nextIdx);
+      pushRoomState({ currentIndex: nextIdx, history: updatedHistory, capturedPhoto: null, lastStationTime: now });
       const relativeIdx = Math.abs(nextIdx - startStationIndex);
-      if (relativeIdx > 0 && relativeIdx % 5 === 0) {
-        setShowFoodDialog(true);
-      }
+      if (relativeIdx > 0 && relativeIdx % 5 === 0) setShowFoodDialog(true);
     }
   };
 
   const handleFoodChallengeResponse = (accept: boolean) => {
     setShowFoodDialog(false);
-    fetchNextQuest(accept);
+    if (accept && selectedLine && roomId) {
+      const current = selectedLine.stations[currentIndex]?.name || "";
+      setCurrentQuest(generateQuestLocal(roomId, current, difficulty, true));
+    }
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -358,16 +334,11 @@ export default function App() {
       const img = new Image();
       img.onload = async () => {
         const MAX_WIDTH = 800;
-        let width = img.width;
-        let height = img.height;
-        if (width > MAX_WIDTH) {
-          height = Math.round((height *= MAX_WIDTH / width));
-          width = MAX_WIDTH;
-        }
+        let width = img.width, height = img.height;
+        if (width > MAX_WIDTH) { height = Math.round((height *= MAX_WIDTH / width)); width = MAX_WIDTH; }
 
         const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
         
         if (ctx) {
@@ -377,12 +348,11 @@ export default function App() {
           try {
             const response = await fetch(compressedDataUrl);
             const blobData = await response.blob();
-            const uploadResponse = await fetch(`/api/upload?filename=${Date.now()}.jpg`, {
-              method: 'POST',
-              body: blobData,
-            });
+            const uploadResponse = await fetch(`/api/upload?filename=${Date.now()}.jpg`, { method: 'POST', body: blobData });
             const result = await uploadResponse.json();
-            setCapturedPhoto(result.url); 
+            
+            setCapturedPhoto(result.url);
+            pushRoomState({ capturedPhoto: result.url }); // 💡 写真を上げたらすぐサーバーに同期！
           } catch (err) {
             console.error('Upload failed', err);
             alert('写真のアップロードに失敗しました。');
@@ -397,27 +367,14 @@ export default function App() {
   const handleShare = async () => {
     if (!selectedLine) return;
     setIsGeneratingShare(true);
-
     try {
       const timeStr = startTime ? formatTimeMs(Date.now() - startTime) : '--:--';
-      const photoUrls = history
-        .filter(item => item.photo)
-        .map(item => item.photo)
-        .slice(0, 4);
-
+      const photoUrls = history.filter(item => item.photo).map(item => item.photo).slice(0, 4);
       const params = new URLSearchParams({
-        line: selectedLine.name,
-        dist: totalDistance.toFixed(2),
-        time: timeStr,
-        team: teamName || 'ゲスト',
-        start: selectedLine.stations[startStationIndex]?.name || '',
-        end: selectedLine.stations[endStationIndex]?.name || '',
-        stations: (totalSteps + 1).toString()
+        line: selectedLine.name, dist: totalDistance.toFixed(2), time: timeStr, team: teamName || 'ゲスト',
+        start: selectedLine.stations[startStationIndex]?.name || '', end: selectedLine.stations[endStationIndex]?.name || '', stations: (totalSteps + 1).toString()
       });
-
-      photoUrls.forEach((url, i) => {
-        if (url) params.append(`p${i + 1}`, url);
-      });
+      photoUrls.forEach((url, i) => { if (url) params.append(`p${i + 1}`, url); });
 
       const ogUrl = `/api/og?${params.toString()}`;
       const response = await fetch(ogUrl);
@@ -425,63 +382,27 @@ export default function App() {
       
       const blob = await response.blob();
       const file = new File([blob], 'metrowalker-result.png', { type: 'image/png' });
-
       const shareText = `MetroWalkerで${selectedLine.name}を歩き切りました！🚶‍♂️✨\n#MetroWalker #東京散歩\n`;
       const shareUrl = window.location.href;
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          title: 'MetroWalker',
-          text: shareText + shareUrl,
-          files: [file],
-        });
+        await navigator.share({ title: 'MetroWalker', text: shareText + shareUrl, files: [file] });
       } else {
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'metrowalker-result.png';
-        a.click();
-        URL.revokeObjectURL(url);
+        const a = document.createElement('a'); a.href = url; a.download = 'metrowalker-result.png'; a.click(); URL.revokeObjectURL(url);
         await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
         alert('画像をダウンロードしました！SNSに添付してシェアしてください。');
       }
     } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        console.error('Share API Error:', error);
-        alert('シェア画像の準備中にエラーが発生しました。');
-      }
-    } finally {
-      setIsGeneratingShare(false);
-    }
+      if (error.name !== 'AbortError') { console.error('Share API Error:', error); alert('シェア画像の準備中にエラーが発生しました。'); }
+    } finally { setIsGeneratingShare(false); }
   };
 
   const resetApp = () => {
-    localStorage.removeItem('metro-walker-state');
-    localStorage.removeItem('metro-walker-line-id');
-    localStorage.removeItem('metro-walker-index');
-    localStorage.removeItem('metro-walker-history');
-    localStorage.removeItem('metro-walker-team-name');
-    localStorage.removeItem('metro-walker-difficulty');
-    localStorage.removeItem('metro-walker-start-index');
-    localStorage.removeItem('metro-walker-end-index');
-    localStorage.removeItem('metro-walker-start-time');
-    localStorage.removeItem('metro-walker-last-time');
-    localStorage.removeItem('metro-walker-room-id');
-    localStorage.removeItem('metro-walker-quest');
-    
-    setState('START');
-    setSelectedLine(null);
-    setCurrentIndex(0);
-    setCurrentQuest(null);
-    setHistory([]);
-    setCapturedPhoto(null);
-    setTeamName('');
-    setDifficulty('NORMAL');
-    setStartTime(null);
-    setLastStationTime(null);
-    setRoomId(null);
-    setShowResetConfirm(false);
-    
+    localStorage.clear();
+    setState('START'); setSelectedLine(null); setCurrentIndex(0); setCurrentQuest(null);
+    setHistory([]); setCapturedPhoto(null); setTeamName(''); setDifficulty('NORMAL');
+    setStartTime(null); setLastStationTime(null); setRoomId(null); setShowResetConfirm(false);
     window.history.replaceState({}, '', window.location.pathname);
   };
 
@@ -497,20 +418,13 @@ export default function App() {
               {state !== 'START' && (
                 selectedLine ? (
                   <motion.button 
-                    key="line-logo"
-                    initial={{ opacity: 0, filter: 'blur(4px)' }}
-                    animate={{ opacity: 1, filter: 'blur(0px)' }}
-                    exit={{ opacity: 0, filter: 'blur(4px)' }}
-                    onClick={() => setShowRouteMap(true)}
-                    className="flex items-center gap-2 hover:opacity-70 transition-opacity active:scale-95"
-                    title="路線図を見る"
+                    key="line-logo" initial={{ opacity: 0, filter: 'blur(4px)' }} animate={{ opacity: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, filter: 'blur(4px)' }}
+                    onClick={() => setShowRouteMap(true)} className="flex items-center gap-2 hover:opacity-70 transition-opacity active:scale-95" title="路線図を見る"
                   >
                     <LineLogo line={selectedLine} />
                     <div className="text-left">
                       <h1 className="font-bold text-lg tracking-tight leading-none">{selectedLine.name}</h1>
-                      <div className="text-[9px] font-bold text-neutral-400 mt-1 uppercase tracking-widest flex items-center gap-1">
-                        <Map className="w-3 h-3" /> View Map
-                      </div>
+                      <div className="text-[9px] font-bold text-neutral-400 mt-1 uppercase tracking-widest flex items-center gap-1"><Map className="w-3 h-3" /> View Map</div>
                     </div>
                   </motion.button>
                 ) : (
@@ -523,82 +437,31 @@ export default function App() {
             </AnimatePresence>
           </div>
           {state !== 'START' && (
-            <button 
-              onClick={() => setShowResetConfirm(true)}
-              className="text-xs font-semibold text-neutral-400 hover:text-neutral-600 transition-colors uppercase tracking-widest"
-            >
-              Reset
-            </button>
+            <button onClick={() => setShowResetConfirm(true)} className="text-xs font-semibold text-neutral-400 hover:text-neutral-600 transition-colors uppercase tracking-widest">Reset</button>
           )}
         </header>
 
         {/* Route Map Modal */}
         <AnimatePresence>
           {showRouteMap && selectedLine && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4"
-              onClick={() => setShowRouteMap(false)}
-            >
-              <motion.div 
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="bg-white sm:rounded-3xl rounded-t-3xl w-full max-w-md h-[85vh] flex flex-col overflow-hidden shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
-              >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4" onClick={() => setShowRouteMap(false)}>
+              <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="bg-white sm:rounded-3xl rounded-t-3xl w-full max-w-md h-[85vh] flex flex-col overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 <div className="p-6 border-b border-neutral-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur z-10">
-                  <div className="flex items-center gap-3">
-                    <LineLogo line={selectedLine} />
-                    <div>
-                      <h3 className="font-bold text-lg leading-tight">{selectedLine.name}</h3>
-                      <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Route Map</div>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setShowRouteMap(false)}
-                    className="p-2 bg-neutral-100 rounded-full text-neutral-500 hover:bg-neutral-900 hover:text-white transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-3"><LineLogo line={selectedLine} /><div><h3 className="font-bold text-lg leading-tight">{selectedLine.name}</h3><div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Route Map</div></div></div>
+                  <button onClick={() => setShowRouteMap(false)} className="p-2 bg-neutral-100 rounded-full text-neutral-500 hover:bg-neutral-900 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
                 </div>
-                
                 <div className="overflow-y-auto p-8 flex-1">
                   <div className="relative border-l-4 ml-4" style={{ borderColor: selectedLine.color }}>
                     {selectedLine.stations.map((station, index) => {
                       const isCurrent = index === currentIndex && (state === 'WALKING' || state === 'SUMMARY');
-                      const start = Math.min(startStationIndex, endStationIndex);
-                      const end = Math.max(startStationIndex, endStationIndex);
-                      const isPassed = state !== 'START' && state !== 'SETUP' && 
-                        (isReverse 
-                          ? (index >= currentIndex && index <= startStationIndex)
-                          : (index <= currentIndex && index >= startStationIndex));
+                      const start = Math.min(startStationIndex, endStationIndex), end = Math.max(startStationIndex, endStationIndex);
+                      const isPassed = state !== 'START' && state !== 'SETUP' && (isReverse ? (index >= currentIndex && index <= startStationIndex) : (index <= currentIndex && index >= startStationIndex));
                       const isTarget = index >= start && index <= end;
-
                       return (
                         <div key={index} className={`mb-8 last:mb-0 relative flex items-center pl-8 ${isTarget ? 'opacity-100' : 'opacity-40'}`}>
-                          <div 
-                            className={`absolute -left-[14px] w-6 h-6 rounded-full border-4 border-white flex items-center justify-center transition-all duration-300
-                              ${isCurrent ? 'scale-150 shadow-lg z-10' : 'z-0'}
-                            `}
-                            style={{ backgroundColor: isCurrent ? '#171717' : isPassed ? selectedLine.color : '#e5e5e5' }}
-                          />
-                          <div className="flex-1">
-                            <div className={`font-bold transition-colors ${isCurrent ? 'text-xl text-neutral-900' : isPassed ? 'text-neutral-700' : 'text-neutral-400'}`}>
-                              {station.name}
-                            </div>
-                            <div className="text-[10px] font-mono text-neutral-400">
-                              {station.reading}
-                            </div>
-                          </div>
-                          {isCurrent && (
-                            <div className="px-3 py-1 bg-neutral-900 text-white text-[10px] font-bold rounded-full uppercase tracking-widest shadow-md">
-                              Current
-                            </div>
-                          )}
+                          <div className={`absolute -left-[14px] w-6 h-6 rounded-full border-4 border-white flex items-center justify-center transition-all duration-300 ${isCurrent ? 'scale-150 shadow-lg z-10' : 'z-0'}`} style={{ backgroundColor: isCurrent ? '#171717' : isPassed ? selectedLine.color : '#e5e5e5' }} />
+                          <div className="flex-1"><div className={`font-bold transition-colors ${isCurrent ? 'text-xl text-neutral-900' : isPassed ? 'text-neutral-700' : 'text-neutral-400'}`}>{station.name}</div><div className="text-[10px] font-mono text-neutral-400">{station.reading}</div></div>
+                          {isCurrent && <div className="px-3 py-1 bg-neutral-900 text-white text-[10px] font-bold rounded-full uppercase tracking-widest shadow-md">Current</div>}
                         </div>
                       );
                     })}
@@ -612,28 +475,12 @@ export default function App() {
         {/* Reset Confirmation Dialog */}
         <AnimatePresence>
           {showResetConfirm && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
-            >
-              <motion.div 
-                initial={{ scale: 0.9, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                className="bg-white rounded-3xl p-8 w-full max-w-sm space-y-6 shadow-2xl"
-              >
-                <div className="text-center space-y-2">
-                  <h3 className="text-2xl font-bold">リセットしますか？</h3>
-                  <p className="text-neutral-500 text-sm">これまでの記録がすべて消去されます。よろしいですか？</p>
-                </div>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+              <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-white rounded-3xl p-8 w-full max-w-sm space-y-6 shadow-2xl">
+                <div className="text-center space-y-2"><h3 className="text-2xl font-bold">リセットしますか？</h3><p className="text-neutral-500 text-sm">これまでの記録がすべて消去されます。よろしいですか？</p></div>
                 <div className="grid gap-3">
-                  <button onClick={resetApp} className="w-full bg-red-500 text-white p-4 rounded-2xl font-bold hover:bg-red-600 transition-all">
-                    リセットする
-                  </button>
-                  <button onClick={() => setShowResetConfirm(false)} className="w-full bg-neutral-100 text-neutral-500 p-4 rounded-2xl font-bold hover:bg-neutral-200 transition-all">
-                    キャンセル
-                  </button>
+                  <button onClick={resetApp} className="w-full bg-red-500 text-white p-4 rounded-2xl font-bold hover:bg-red-600 transition-all">リセットする</button>
+                  <button onClick={() => setShowResetConfirm(false)} className="w-full bg-neutral-100 text-neutral-500 p-4 rounded-2xl font-bold hover:bg-neutral-200 transition-all">キャンセル</button>
                 </div>
               </motion.div>
             </motion.div>
@@ -655,30 +502,12 @@ export default function App() {
                 </div>
                 
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Team Name</label>
-                    <input 
-                      type="text" 
-                      value={teamName}
-                      onChange={(e) => setTeamName(e.target.value)}
-                      className="w-full p-4 rounded-2xl border border-neutral-100 bg-neutral-50 focus:border-neutral-900 outline-none transition-all font-bold"
-                      placeholder="チーム名を入力"
-                    />
-                  </div>
-
+                  <div className="space-y-2"><label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Team Name</label><input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="w-full p-4 rounded-2xl border border-neutral-100 bg-neutral-50 focus:border-neutral-900 outline-none transition-all font-bold" placeholder="チーム名を入力" /></div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Difficulty</label>
                     <div className="grid grid-cols-3 gap-2">
                       {(['EASY', 'NORMAL', 'HARD'] as Difficulty[]).map((d) => (
-                        <button
-                          key={d}
-                          onClick={() => setDifficulty(d)}
-                          className={`p-3 rounded-xl text-xs font-bold border-2 transition-all ${
-                            difficulty === d ? 'bg-neutral-900 border-neutral-900 text-white' : 'bg-white border-neutral-100 text-neutral-400 hover:border-neutral-200'
-                          }`}
-                        >
-                          {d}
-                        </button>
+                        <button key={d} onClick={() => setDifficulty(d)} className={`p-3 rounded-xl text-xs font-bold border-2 transition-all ${difficulty === d ? 'bg-neutral-900 border-neutral-900 text-white' : 'bg-white border-neutral-100 text-neutral-400 hover:border-neutral-200'}`}>{d}</button>
                       ))}
                     </div>
                   </div>
@@ -688,19 +517,8 @@ export default function App() {
                   <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Select Line</label>
                   <div className="grid gap-3">
                     {METRO_LINES.map((line) => (
-                      <button
-                        key={line.id}
-                        onClick={() => handleSelectLine(line)}
-                        className="group relative flex items-center justify-between p-4 rounded-2xl border border-neutral-100 bg-white hover:border-neutral-300 hover:shadow-md transition-all text-left"
-                      >
-                        <div className="flex items-center gap-4">
-                          <LineLogo line={line} size="w-10 h-10" fontSize="text-lg" />
-                          <div>
-                            <div className="font-bold text-neutral-800">{line.name}</div>
-                            <div className="text-xs text-neutral-400">{line.stations.length} 駅</div>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-neutral-300 group-hover:text-neutral-500 transition-colors" />
+                      <button key={line.id} onClick={() => handleSelectLine(line)} className="group relative flex items-center justify-between p-4 rounded-2xl border border-neutral-100 bg-white hover:border-neutral-300 hover:shadow-md transition-all text-left">
+                        <div className="flex items-center gap-4"><LineLogo line={line} size="w-10 h-10" fontSize="text-lg" /><div><div className="font-bold text-neutral-800">{line.name}</div><div className="text-xs text-neutral-400">{line.stations.length} 駅</div></div></div><ChevronRight className="w-5 h-5 text-neutral-300 group-hover:text-neutral-500 transition-colors" />
                       </button>
                     ))}
                   </div>
@@ -711,106 +529,59 @@ export default function App() {
             {/* SETUP STATE */}
             {state === 'SETUP' && selectedLine && (
               <motion.div key="setup" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="p-6 space-y-8">
-                <button onClick={() => setState('START')} className="flex items-center gap-2 text-neutral-400 hover:text-neutral-900 transition-colors">
-                  <ArrowLeft className="w-4 h-4" />
-                  <span className="text-xs font-bold uppercase tracking-widest">Back</span>
-                </button>
-
-                <div className="space-y-2">
-                  <h2 className="text-3xl font-bold leading-tight">区間を設定</h2>
-                  <p className="text-neutral-500 text-sm">{selectedLine.name} のどこからどこまで歩きますか？</p>
-                </div>
+                <button onClick={() => setState('START')} className="flex items-center gap-2 text-neutral-400 hover:text-neutral-900 transition-colors"><ArrowLeft className="w-4 h-4" /><span className="text-xs font-bold uppercase tracking-widest">Back</span></button>
+                <div className="space-y-2"><h2 className="text-3xl font-bold leading-tight">区間を設定</h2><p className="text-neutral-500 text-sm">{selectedLine.name} のどこからどこまで歩きますか？</p></div>
 
                 <div className="space-y-6">
-                  {setupError && (
-                    <div className="p-4 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100">
-                      {setupError}
-                    </div>
-                  )}
-                  
+                  {setupError && <div className="p-4 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100">{setupError}</div>}
                   {selectedLine && (
                     <div className="p-4 bg-neutral-900 text-white rounded-2xl flex justify-between items-center">
-                      <div>
-                        <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Total Distance</div>
-                        <div className="text-xl font-bold">{totalDistance.toFixed(2)} km</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Stations</div>
-                        <div className="text-xl font-bold">{totalSteps + 1}</div>
-                      </div>
+                      <div><div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Total Distance</div><div className="text-xl font-bold">{totalDistance.toFixed(2)} km</div></div>
+                      <div className="text-right"><div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Stations</div><div className="text-xl font-bold">{totalSteps + 1}</div></div>
                     </div>
                   )}
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Start Station</label>
-                    <select 
-                      value={startStationIndex}
-                      onChange={(e) => setStartStationIndex(parseInt(e.target.value, 10))}
-                      className="w-full p-4 rounded-2xl border border-neutral-100 bg-neutral-50 font-bold outline-none appearance-none"
-                    >
-                      {selectedLine.stations.map((s, i) => (
-                        <option key={i} value={i}>{s.name}</option>
-                      ))}
+                    <select value={startStationIndex} onChange={(e) => setStartStationIndex(parseInt(e.target.value, 10))} className="w-full p-4 rounded-2xl border border-neutral-100 bg-neutral-50 font-bold outline-none appearance-none">
+                      {selectedLine.stations.map((s, i) => (<option key={i} value={i}>{s.name}</option>))}
                     </select>
                   </div>
-
-                  <div className="flex justify-center">
-                    <ChevronRight className="w-6 h-6 text-neutral-300 rotate-90" />
-                  </div>
-
+                  <div className="flex justify-center"><ChevronRight className="w-6 h-6 text-neutral-300 rotate-90" /></div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Goal Station</label>
-                    <select 
-                      value={endStationIndex}
-                      onChange={(e) => setEndStationIndex(parseInt(e.target.value, 10))}
-                      className="w-full p-4 rounded-2xl border border-neutral-100 bg-neutral-50 font-bold outline-none appearance-none"
-                    >
-                      {selectedLine.stations.map((s, i) => (
-                        <option key={i} value={i}>{s.name}</option>
-                      ))}
+                    <select value={endStationIndex} onChange={(e) => setEndStationIndex(parseInt(e.target.value, 10))} className="w-full p-4 rounded-2xl border border-neutral-100 bg-neutral-50 font-bold outline-none appearance-none">
+                      {selectedLine.stations.map((s, i) => (<option key={i} value={i}>{s.name}</option>))}
                     </select>
                   </div>
                 </div>
 
-                {/* 💡 Walica式：まずはルームを作成するボタンに変更 */}
                 <button onClick={handleCreateRoom} className="w-full bg-neutral-900 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 active:scale-95 transition-all">
-                  <span>ルームを作成する</span>
-                  <ChevronRight className="w-5 h-5" />
+                  <span>ルームを作成する</span><ChevronRight className="w-5 h-5" />
                 </button>
               </motion.div>
             )}
 
-            {/* 💡 新設：SHARE STATE (Walica式 待機画面) */}
+            {/* SHARE STATE */}
             {state === 'SHARE' && selectedLine && (
               <motion.div key="share" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="p-6 space-y-8">
-                <button onClick={() => setState('SETUP')} className="flex items-center gap-2 text-neutral-400 hover:text-neutral-900 transition-colors">
-                  <ArrowLeft className="w-4 h-4" />
-                  <span className="text-xs font-bold uppercase tracking-widest">Back</span>
-                </button>
+                <button onClick={() => setState('SETUP')} className="flex items-center gap-2 text-neutral-400 hover:text-neutral-900 transition-colors"><ArrowLeft className="w-4 h-4" /><span className="text-xs font-bold uppercase tracking-widest">Back</span></button>
 
                 <div className="text-center space-y-4 py-8">
-                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Share2 className="w-10 h-10 text-emerald-600" />
-                  </div>
+                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6"><Share2 className="w-10 h-10 text-emerald-600" /></div>
                   <h2 className="text-2xl font-bold">ルームの準備ができました！</h2>
                   <p className="text-neutral-500 text-sm">このURLを一緒に歩くメンバーに送って、同じお題に挑戦しましょう。</p>
                 </div>
 
                 <div className="p-4 bg-neutral-50 border border-neutral-100 rounded-2xl flex items-center justify-between gap-4">
-                  <div className="text-xs font-mono text-neutral-500 truncate flex-1">
-                    {window.location.href}
-                  </div>
-                  <button onClick={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    alert('URLをコピーしました！');
-                  }} className="px-4 py-2 bg-neutral-900 text-white text-xs font-bold rounded-xl whitespace-nowrap active:scale-95 transition-transform">
+                  <div className="text-xs font-mono text-neutral-500 truncate flex-1">{window.location.href}</div>
+                  <button onClick={() => { navigator.clipboard.writeText(window.location.href); alert('URLをコピーしました！'); }} className="px-4 py-2 bg-neutral-900 text-white text-xs font-bold rounded-xl whitespace-nowrap active:scale-95 transition-transform">
                     コピー
                   </button>
                 </div>
 
                 <button onClick={handleStartWalk} className="w-full bg-neutral-900 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 active:scale-95 transition-all mt-8">
-                  <span>出発する！</span>
-                  <ChevronRight className="w-5 h-5" />
+                  <span>出発する！</span><ChevronRight className="w-5 h-5" />
                 </button>
               </motion.div>
             )}
@@ -819,34 +590,15 @@ export default function App() {
             {state === 'WALKING' && selectedLine && (
               <motion.div key="walking" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-6 space-y-6">
                 
-                {/* Food Mission Dialog */}
                 <AnimatePresence>
                   {showFoodDialog && (
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
-                    >
-                      <motion.div 
-                        initial={{ scale: 0.9, y: 20 }}
-                        animate={{ scale: 1, y: 0 }}
-                        className="bg-white rounded-3xl p-8 w-full max-w-sm space-y-6 shadow-2xl"
-                      >
-                        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto">
-                          <UtensilsCrossed className="w-8 h-8 text-amber-600" />
-                        </div>
-                        <div className="text-center space-y-2">
-                          <h3 className="text-2xl font-bold">食のミッション！</h3>
-                          <p className="text-neutral-500 text-sm">5駅歩きましたね。この街ならではの「食ミッション」にチャレンジしますか？</p>
-                        </div>
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+                      <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-white rounded-3xl p-8 w-full max-w-sm space-y-6 shadow-2xl">
+                        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto"><UtensilsCrossed className="w-8 h-8 text-amber-600" /></div>
+                        <div className="text-center space-y-2"><h3 className="text-2xl font-bold">食のミッション！</h3><p className="text-neutral-500 text-sm">5駅歩きましたね。この街ならではの「食ミッション」にチャレンジしますか？</p></div>
                         <div className="grid gap-3">
-                          <button onClick={() => handleFoodChallengeResponse(true)} className="w-full bg-neutral-900 text-white p-4 rounded-2xl font-bold hover:bg-neutral-800 transition-all">
-                            チャレンジする！
-                          </button>
-                          <button onClick={() => handleFoodChallengeResponse(false)} className="w-full bg-neutral-100 text-neutral-500 p-4 rounded-2xl font-bold hover:bg-neutral-200 transition-all">
-                            今回はパス
-                          </button>
+                          <button onClick={() => handleFoodChallengeResponse(true)} className="w-full bg-neutral-900 text-white p-4 rounded-2xl font-bold hover:bg-neutral-800 transition-all">チャレンジする！</button>
+                          <button onClick={() => handleFoodChallengeResponse(false)} className="w-full bg-neutral-100 text-neutral-500 p-4 rounded-2xl font-bold hover:bg-neutral-200 transition-all">今回はパス</button>
                         </div>
                       </motion.div>
                     </motion.div>
@@ -856,25 +608,10 @@ export default function App() {
                 {/* Timer & Progress Bar */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-end">
-                    <div>
-                      <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> Elapsed Time
-                      </div>
-                      {startTime ? <TimerDisplay startTime={startTime} /> : <div className="font-mono font-bold text-xl tracking-wider">00:00</div>}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Progress</div>
-                      <div className="text-lg font-bold">{currentStep + 1} <span className="text-sm text-neutral-400">/ {totalSteps + 1}</span></div>
-                    </div>
+                    <div><div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Clock className="w-3 h-3" /> Elapsed Time</div>{startTime ? <TimerDisplay startTime={startTime} /> : <div className="font-mono font-bold text-xl tracking-wider">00:00</div>}</div>
+                    <div className="text-right"><div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Progress</div><div className="text-lg font-bold">{currentStep + 1} <span className="text-sm text-neutral-400">/ {totalSteps + 1}</span></div></div>
                   </div>
-                  <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                    <motion.div 
-                      className="h-full"
-                      style={{ backgroundColor: selectedLine.color }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${((currentStep + 1) / (totalSteps + 1)) * 100}%` }}
-                    />
-                  </div>
+                  <div className="h-2 bg-neutral-100 rounded-full overflow-hidden"><motion.div className="h-full" style={{ backgroundColor: selectedLine.color }} initial={{ width: 0 }} animate={{ width: `${((currentStep + 1) / (totalSteps + 1)) * 100}%` }} /></div>
                 </div>
 
                 {/* Current Segment */}
@@ -883,21 +620,12 @@ export default function App() {
                     <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-tighter mb-2">Current</div>
                     <StationLogo line={selectedLine} stationNumber={(currentIndex + 1).toString().padStart(2, '0')} size="w-10 h-10" fontSize="text-xl" numberFontSize="text-xs" />
                     <div className="font-bold text-sm mt-1">{selectedLine.stations[currentIndex]?.name}</div>
-                    <div className="text-[8px] font-mono text-neutral-400 mt-1">
-                      {selectedLine.stations[currentIndex] ? `${formatDMS(selectedLine.stations[currentIndex].lat, true)}, ${formatDMS(selectedLine.stations[currentIndex].lng, false)}` : ''}
-                    </div>
                   </div>
-                  <div className="px-2 z-10 flex flex-col items-center gap-1">
-                    <ChevronRight className="w-6 h-6 text-neutral-300" />
-                    <div className="text-[10px] font-bold text-neutral-400">{distanceToNext.toFixed(2)}km</div>
-                  </div>
+                  <div className="px-2 z-10 flex flex-col items-center gap-1"><ChevronRight className="w-6 h-6 text-neutral-300" /><div className="text-[10px] font-bold text-neutral-400">{distanceToNext.toFixed(2)}km</div></div>
                   <div className="text-center flex-1 z-10 flex flex-col items-center">
                     <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-tighter mb-2">Next</div>
                     <StationLogo line={selectedLine} stationNumber={(currentIndex + step + 1).toString().padStart(2, '0')} size="w-10 h-10" fontSize="text-xl" numberFontSize="text-xs" />
                     <div className="font-bold text-sm mt-1">{selectedLine.stations[currentIndex + step]?.name}</div>
-                    <div className="text-[8px] font-mono text-neutral-400 mt-1">
-                      {selectedLine.stations[currentIndex + step] ? `${formatDMS(selectedLine.stations[currentIndex + step].lat, true)}, ${formatDMS(selectedLine.stations[currentIndex + step].lng, false)}` : ''}
-                    </div>
                   </div>
                 </div>
 
@@ -907,26 +635,12 @@ export default function App() {
                   <div className="bg-white border-2 border-neutral-900 rounded-3xl p-6 pt-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)]">
                     {currentQuest ? (
                       <div className="space-y-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="text-xs font-bold text-neutral-400 mb-1 italic">Theme:</div>
-                            <h3 className="text-xl font-bold text-neutral-900 leading-tight">{currentQuest.theme}</h3>
-                          </div>
-                        </div>
-                        <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-100">
-                          <div className="text-xs font-bold text-neutral-400 mb-2 uppercase tracking-widest">Mission</div>
-                          <p className="text-neutral-800 font-medium leading-relaxed">{currentQuest.mission}</p>
-                        </div>
-                        <div className="flex gap-3 items-start text-neutral-500">
-                          <Info className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs leading-relaxed italic">{currentQuest.hint}</p>
-                        </div>
+                        <div><div className="text-xs font-bold text-neutral-400 mb-1 italic">Theme:</div><h3 className="text-xl font-bold text-neutral-900 leading-tight">{currentQuest.theme}</h3></div>
+                        <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-100"><div className="text-xs font-bold text-neutral-400 mb-2 uppercase tracking-widest">Mission</div><p className="text-neutral-800 font-medium leading-relaxed">{currentQuest.mission}</p></div>
+                        <div className="flex gap-3 items-start text-neutral-500"><Info className="w-5 h-5 mt-0.5 flex-shrink-0" /><p className="text-xs leading-relaxed italic">{currentQuest.hint}</p></div>
                       </div>
                     ) : (
-                      <div className="py-12 flex flex-col items-center justify-center gap-4">
-                        <RefreshCw className="w-8 h-8 text-neutral-300 animate-spin" />
-                        <p className="text-sm text-neutral-400 font-medium">ミッションを準備中...</p>
-                      </div>
+                      <div className="py-12 flex flex-col items-center justify-center gap-4"><RefreshCw className="w-8 h-8 text-neutral-300 animate-spin" /><p className="text-sm text-neutral-400 font-medium">ミッションを準備中...</p></div>
                     )}
                   </div>
                 </div>
@@ -935,14 +649,12 @@ export default function App() {
                 <div className="space-y-3 pt-4">
                   <div className="flex gap-3">
                     <button onClick={() => fileInputRef.current?.click()} className={`flex-1 flex items-center justify-center gap-2 p-4 rounded-2xl border-2 transition-all font-bold ${capturedPhoto ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white border-neutral-100 text-neutral-600 hover:border-neutral-300'}`}>
-                      {capturedPhoto ? <CheckCircle2 className="w-5 h-5" /> : <Camera className="w-5 h-5" />}
-                      {capturedPhoto ? 'Photo Added' : 'Add Photo'}
+                      {capturedPhoto ? <CheckCircle2 className="w-5 h-5" /> : <Camera className="w-5 h-5" />}{capturedPhoto ? 'Photo Added' : 'Add Photo'}
                     </button>
                     <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} accept="image/*" className="hidden" />
                   </div>
                   <button onClick={handleNextStation} className="w-full bg-neutral-900 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 active:scale-95 transition-all">
-                    <span>Next Station</span>
-                    <ChevronRight className="w-5 h-5" />
+                    <span>Next Station</span><ChevronRight className="w-5 h-5" />
                   </button>
                 </div>
 
@@ -964,12 +676,6 @@ export default function App() {
                               {item.to.name}
                             </div>
                             <div className="text-sm font-bold text-neutral-700">{item.quest.theme}</div>
-                            {item.timeTakenMs && (
-                              <div className="text-[10px] font-bold text-neutral-500 mt-1 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {formatTimeMs(item.timeTakenMs)} かかりました
-                              </div>
-                            )}
                           </div>
                         </div>
                       ))}
@@ -983,102 +689,34 @@ export default function App() {
             {state === 'SUMMARY' && selectedLine && (
               <motion.div key="summary" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-6 space-y-8 text-center">
                 <div className="py-8 space-y-4">
-                  <div className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center mx-auto shadow-lg">
-                    <Trophy className="w-10 h-10 text-white" />
-                  </div>
-                  <div className="space-y-1">
-                    <h2 className="text-3xl font-bold">制覇完了！</h2>
-                    <p className="text-neutral-500">東京メトロ {selectedLine.name} を歩き切りました。</p>
-                    {startTime && (
-                      <p className="text-sm font-bold text-neutral-700 mt-2">
-                        総合タイム: {formatTimeMs(Date.now() - startTime)}
-                      </p>
-                    )}
-                  </div>
+                  <div className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center mx-auto shadow-lg"><Trophy className="w-10 h-10 text-white" /></div>
+                  <div className="space-y-1"><h2 className="text-3xl font-bold">制覇完了！</h2><p className="text-neutral-500">東京メトロ {selectedLine.name} を歩き切りました。</p></div>
                 </div>
-
                 <div className="bg-neutral-900 text-white p-6 rounded-3xl space-y-6 text-left">
                   <div className="flex justify-between items-end border-b border-white/10 pb-4">
-                    <div>
-                      <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Total Walk</div>
-                      <div className="text-2xl font-bold">{totalDistance.toFixed(2)} km</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Team</div>
-                      <div className="text-sm font-bold">{teamName}</div>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                    <div className="flex-1">
-                      <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Route</div>
-                      <div className="flex items-center gap-4">
-                        <div className="flex flex-col items-center">
-                          <StationLogo line={selectedLine} stationNumber={(startStationIndex + 1).toString().padStart(2, '0')} size="w-8 h-8" fontSize="text-sm" numberFontSize="text-[10px]" />
-                          <div className="text-[10px] font-bold mt-1 text-center">{selectedLine.stations[startStationIndex]?.name}</div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-white/20" />
-                        <div className="flex flex-col items-center">
-                          <StationLogo line={selectedLine} stationNumber={(endStationIndex + 1).toString().padStart(2, '0')} size="w-8 h-8" fontSize="text-sm" numberFontSize="text-[10px]" />
-                          <div className="text-[10px] font-bold mt-1 text-center">{selectedLine.stations[endStationIndex]?.name}</div>
-                        </div>
-                      </div>
-                    </div>
+                    <div><div className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Total Walk</div><div className="text-2xl font-bold">{totalDistance.toFixed(2)} km</div></div>
                   </div>
                   <div className="space-y-4">
                     <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest">Journey Highlights</h4>
                     <div className="grid grid-cols-3 gap-2">
                       {history.filter(h => h.photo).slice(0, 6).map((item, i) => (
-                        <div key={i} className="aspect-square rounded-lg bg-white/5 overflow-hidden border border-white/10">
-                          <img src={item.photo} alt="Memory" className="w-full h-full object-cover" />
-                        </div>
+                        <div key={i} className="aspect-square rounded-lg bg-white/5 overflow-hidden border border-white/10"><img src={item.photo} alt="Memory" className="w-full h-full object-cover" /></div>
                       ))}
                     </div>
                   </div>
                 </div>
                 
-                <button 
-                  onClick={handleShare} 
-                  disabled={isGeneratingShare}
-                  className="w-full flex items-center justify-center gap-2 bg-neutral-800 text-white p-4 rounded-2xl font-bold hover:bg-neutral-700 transition-all mt-6 disabled:opacity-50"
-                >
-                  {isGeneratingShare ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" /> 画像を生成中...</>
-                  ) : (
-                    <><Share2 className="w-5 h-5" /> 結果を画像でシェア</>
-                  )}
+                <button onClick={handleShare} disabled={isGeneratingShare} className="w-full flex items-center justify-center gap-2 bg-neutral-800 text-white p-4 rounded-2xl font-bold hover:bg-neutral-700 transition-all mt-6 disabled:opacity-50">
+                  {isGeneratingShare ? <><Loader2 className="w-5 h-5 animate-spin" /> 画像を生成中...</> : <><Share2 className="w-5 h-5" /> 結果を画像でシェア</>}
                 </button>
 
                 <div className="space-y-3">
-                  <button onClick={resetApp} className="w-full text-neutral-400 p-4 rounded-2xl font-bold hover:text-neutral-600 transition-all">
-                    Back to Home
-                  </button>
+                  <button onClick={resetApp} className="w-full text-neutral-400 p-4 rounded-2xl font-bold hover:text-neutral-600 transition-all">Back to Home</button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </main>
-
-        {/* Bottom Navigation (Floating) */}
-        {state === 'WALKING' && (
-          <div className="absolute bottom-6 left-6 right-6 z-30">
-            <div className="bg-white/90 backdrop-blur-md border border-neutral-100 p-2 rounded-2xl shadow-2xl flex items-center justify-between">
-              <div className="flex items-center gap-3 px-2">
-                {selectedLine && <LineLogo line={selectedLine} size="w-8 h-8" fontSize="text-xs" />}
-                <div className="text-xs font-bold text-neutral-800 truncate max-w-[100px]">
-                  {selectedLine?.stations[currentIndex]?.name || 'Station'}
-                </div>
-              </div>
-              <div className="h-8 w-[1px] bg-neutral-100 mx-2" />
-              <div className="flex-1 text-right px-2">
-                <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-tighter">Next</div>
-                <div className="text-xs font-bold text-neutral-800 truncate">
-                  {selectedLine?.stations[currentIndex + step]?.name || 'Goal'}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   );
