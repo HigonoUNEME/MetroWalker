@@ -4,39 +4,37 @@ import { MetroLine } from '../constants';
 interface StationLogoProps {
   line: MetroLine;
   stationNumber: string;
-  size?: string;
-  fontSize?: string;
-  numberFontSize?: string;
+  size?: string; // 例: "w-[60px] h-[60px]"
 }
 
 const StationLogo: React.FC<StationLogoProps> = ({ 
   line, 
   stationNumber, 
-  size = "w-[60px] h-[60px]", 
-  fontSize = "text-[28px]",
-  numberFontSize = "text-[18px]"
+  size = "w-12 h-12"
 }) => {
   return (
-    <div className="flex flex-col items-center" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
-      {/* Round Logo */}
+    <div className="flex flex-col items-center">
+      {/* 東京メトロ公式ガイドライン風の駅ナンバリングマーク
+         - 外枠：路線の色
+         - 背景：白
+         - 文字：路線記号（路線の色）と数字（黒）
+      */}
       <div 
-        className={`${size} rounded-full flex items-center justify-center relative`}
-        style={{ backgroundColor: line.color }}
+        className={`${size} rounded-full border-[3px] bg-white flex flex-col items-center justify-center shadow-sm`}
+        style={{ borderColor: line.color }}
       >
-        {/* Inner White Circle */}
-        <div className="w-1/2 h-1/2 bg-white rounded-full flex items-center justify-center">
-          <span className={`${fontSize} font-bold leading-none text-black`}>
-            {line.id}
-          </span>
+        <div 
+          className="font-bold leading-none text-[40%] uppercase" 
+          style={{ color: line.color, fontFamily: "Arial, sans-serif" }}
+        >
+          {line.id}
         </div>
-      </div>
-      
-      {/* Station Number */}
-      <div 
-        className={`mt-[6px] font-bold ${numberFontSize}`}
-        style={{ color: line.color }}
-      >
-        {stationNumber}
+        <div 
+          className="font-black leading-none text-[45%] text-black"
+          style={{ fontFamily: "Arial, sans-serif" }}
+        >
+          {stationNumber}
+        </div>
       </div>
     </div>
   );
