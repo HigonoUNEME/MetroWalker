@@ -146,67 +146,73 @@ export default function App() {
   })() : 0;
 
   // 初期読み込み＆URL解析
+  // 初期読み込み＆URL解析
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const r = params.get('r');
 
+    // ローカルストレージからすべての記憶を取り出しておく
+    const savedState = localStorage.getItem('metro-walker-state');
+    const savedLineId = localStorage.getItem('metro-walker-line-id');
+    const savedTeamName = localStorage.getItem('metro-walker-team-name');
+    const savedDifficulty = localStorage.getItem('metro-walker-difficulty');
+    const savedStartIndex = localStorage.getItem('metro-walker-start-index');
+    const savedEndIndex = localStorage.getItem('metro-walker-end-index');
+    const savedIndex = localStorage.getItem('metro-walker-index');
+    const savedHistory = localStorage.getItem('metro-walker-history');
+    const savedStartTime = localStorage.getItem('metro-walker-start-time');
+    const savedLastTime = localStorage.getItem('metro-walker-last-time');
+    const savedRoomId = localStorage.getItem('metro-walker-room-id');
+    const savedPhoto = localStorage.getItem('metro-walker-photo');
+    const savedAttempt = localStorage.getItem('metro-walker-attempt');
+
     if (r) {
+      // 💡 パターンA: 共有URLから入ってきた場合
       const l = params.get('l'), s = params.get('s'), e = params.get('e'), d = params.get('d');
       if (l && s && e && d) {
         const line = METRO_LINES.find(x => x.id === l);
         if (line) {
-          setSelectedLine(line); setStartStationIndex(Number(s)); setEndStationIndex(Number(e));
-          setDifficulty(d as Difficulty); setRoomId(r);
-          const savedState = localStorage.getItem('metro-walker-state');
-          if (savedState !== 'WALKING' && savedState !== 'SUMMARY') setState('SHARE');
-          else setState(savedState as AppState);
+          setSelectedLine(line); 
+          setStartStationIndex(Number(s)); 
+          setEndStationIndex(Number(e));
+          setDifficulty(d as Difficulty); 
+          setRoomId(r);
+
+          // すでにこのルームで歩いている途中でリロードした場合は、時間をしっかり復元！
+          if (savedRoomId === r && (savedState === 'WALKING' || savedState === 'SUMMARY')) {
+            setState(savedState as AppState);
+            if (savedTeamName) setTeamName(savedTeamName);
+            if (savedIndex) setCurrentIndex(Number(savedIndex));
+            if (savedHistory) setHistory(JSON.parse(savedHistory));
+            if (savedStartTime) setStartTime(Number(savedStartTime)); // ⏱️ ここが抜けていました！
+            if (savedLastTime) setLastStationTime(Number(savedLastTime));
+            if (savedPhoto) setCapturedPhoto(savedPhoto);
+            if (savedAttempt) setQuestAttempt(Number(savedAttempt));
+          } else {
+            // まだ歩き始めていない（または初めて招待URLを開いた）場合は待機画面へ
+            setState('SHARE');
+          }
         }
       }
     } else {
-      if (localStorage.getItem('metro-walker-team-name')) setTeamName(localStorage.getItem('metro-walker-team-name')!);
-      if (localStorage.getItem('metro-walker-difficulty')) setDifficulty(localStorage.getItem('metro-walker-difficulty') as Difficulty);
-      if (localStorage.getItem('metro-walker-start-index')) setStartStationIndex(Number(localStorage.getItem('metro-walker-start-index')));
-      if (localStorage.getItem('metro-walker-end-index')) setEndStationIndex(Number(localStorage.getItem('metro-walker-end-index')));
-      if (localStorage.getItem('metro-walker-state')) setState(localStorage.getItem('metro-walker-state') as AppState);
-      const savedLineId = localStorage.getItem('metro-walker-line-id');
+      // 💡 パターンB: URLパラメータがない場合（PWAアイコンからの起動など）の通常復元
+      if (savedTeamName) setTeamName(savedTeamName);
+      if (savedDifficulty) setDifficulty(savedDifficulty as Difficulty);
+      if (savedStartIndex) setStartStationIndex(Number(savedStartIndex));
+      if (savedEndIndex) setEndStationIndex(Number(savedEndIndex));
+      if (savedState) setState(savedState as AppState);
       if (savedLineId) setSelectedLine(METRO_LINES.find(l => l.id === savedLineId) || null);
-      if (localStorage.getItem('metro-walker-index')) setCurrentIndex(Number(localStorage.getItem('metro-walker-index')));
-      if (localStorage.getItem('metro-walker-history')) setHistory(JSON.parse(localStorage.getItem('metro-walker-history')!));
-      if (localStorage.getItem('metro-walker-start-time')) setStartTime(Number(localStorage.getItem('metro-walker-start-time')));
-      if (localStorage.getItem('metro-walker-last-time')) setLastStationTime(Number(localStorage.getItem('metro-walker-last-time')));
-      if (localStorage.getItem('metro-walker-room-id')) setRoomId(localStorage.getItem('metro-walker-room-id'));
-      if (localStorage.getItem('metro-walker-photo')) setCapturedPhoto(localStorage.getItem('metro-walker-photo'));
-      if (localStorage.getItem('metro-walker-attempt')) setQuestAttempt(Number(localStorage.getItem('metro-walker-attempt')));
+      if (savedIndex) setCurrentIndex(Number(savedIndex));
+      if (savedHistory) setHistory(JSON.parse(savedHistory));
+      if (savedStartTime) setStartTime(Number(savedStartTime));
+      if (savedLastTime) setLastStationTime(Number(savedLastTime));
+      if (savedRoomId) setRoomId(savedRoomId);
+      if (savedPhoto) setCapturedPhoto(savedPhoto);
+      if (savedAttempt) setQuestAttempt(Number(savedAttempt));
     }
   }, []);
+
   
-  // スマホへ強力保存
-  useEffect(() => {
-    localStorage.setItem('metro-walker-state', state);
-    localStorage.setItem('metro-walker-team-name', teamName);
-    localStorage.setItem('metro-walker-difficulty', difficulty);
-    localStorage.setItem('metro-walker-start-index', startStationIndex.toString());
-    localStorage.setItem('metro-walker-end-index', endStationIndex.toString());
-    if (selectedLine) localStorage.setItem('metro-walker-line-id', selectedLine.id);
-    localStorage.setItem('metro-walker-index', currentIndex.toString());
-    localStorage.setItem('metro-walker-history', JSON.stringify(history));
-    if (startTime) localStorage.setItem('metro-walker-start-time', startTime.toString());
-    if (lastStationTime) localStorage.setItem('metro-walker-last-time', lastStationTime.toString());
-    if (roomId) localStorage.setItem('metro-walker-room-id', roomId);
-    localStorage.setItem('metro-walker-attempt', questAttempt.toString());
-    if (capturedPhoto) localStorage.setItem('metro-walker-photo', capturedPhoto);
-    else localStorage.removeItem('metro-walker-photo');
-  }, [state, selectedLine, currentIndex, history, teamName, difficulty, startStationIndex, endStationIndex, startTime, lastStationTime, roomId, capturedPhoto, questAttempt]);
-
-  // サーバーに現在の状況を送信する関数
-  const pushRoomState = (overrides: any = {}) => {
-    if (!roomId) return;
-    const payload = { currentIndex, history, startTime, lastStationTime, capturedPhoto, questAttempt, ...overrides };
-    fetch(`/api/room/${roomId}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-    }).catch(e => console.error("Sync error", e));
-  };
-
   // 💡 自動同期（ポーリング）でチェンジ情報も受け取る
   useEffect(() => {
     if (state !== 'WALKING' || !roomId) return;
