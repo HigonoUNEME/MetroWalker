@@ -272,3 +272,41 @@ export const generateQuest = async (
     isFoodMission: isFoodChallenge
   };
 };
+// --- src/data/stationData.ts の一番下に追加 ---
+
+// 文字列から固有の数字（シード）を作る魔法の関数
+const getHash = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+};
+
+// サーバーを使わずに、フロントエンドだけで「ルーム共通のお題」を即座に出す関数
+export const generateQuestLocal = (
+  roomId: string,
+  currentStation: string, 
+  difficulty: 'EASY' | 'NORMAL' | 'HARD', 
+  isFoodChallenge: boolean
+): SanpoQuest => {
+  const stationSpecialty = getStationSpecialty(currentStation);
+  let pool = isFoodChallenge ? FOOD_MISSIONS : MISSION_BANK.filter(m => m.difficulty === difficulty);
+  if (pool.length === 0) pool = MISSION_BANK;
+  
+  // ルームIDと駅名を混ぜてハッシュ化（同じルーム・同じ駅ならスマホが違っても絶対に同じ数字になる！）
+  const hash = getHash(`${roomId}-${currentStation}`);
+  
+  const featureArray = isFoodChallenge ? stationSpecialty.foods : stationSpecialty.famous;
+  const featureWord = featureArray[hash % featureArray.length];
+  const selected = pool[hash % pool.length];
+
+  return {
+    theme: selected.theme,
+    mission: selected.mission.replace(/\$\{famous\}/g, featureWord).replace(/\$\{food\}/g, featureWord),
+    hint: selected.hint,
+    difficulty: selected.difficulty,
+    isFoodMission: isFoodChallenge
+  };
+};
