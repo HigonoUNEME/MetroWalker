@@ -173,6 +173,7 @@ export default function App() {
   })() : 0;
 
   useEffect(() => {
+    // 基本ステータスの復元
     const savedState = localStorage.getItem('metro-walker-state');
     const savedLineId = localStorage.getItem('metro-walker-line-id');
     const savedTeamName = localStorage.getItem('metro-walker-team-name');
@@ -197,62 +198,46 @@ export default function App() {
     if (savedHistory) setHistory(JSON.parse(savedHistory));
     if (savedStartTime) setStartTime(parseInt(savedStartTime, 10));
     if (savedLastTime) setLastStationTime(parseInt(savedLastTime, 10));
-  }, []);
 
-
-  // --- ここから追加：リロード時のお題復元処理 ---
-  useEffect(() => {
+    // 💡【重要】お題の復元（PWA対策 ＆ シェア対応の両立）
     const params = new URLSearchParams(window.location.search);
-    const qid = params.get('qid');
+    const urlQid = params.get('qid');
+    const savedQid = localStorage.getItem('metro-walker-qid');
+    const savedQuest = localStorage.getItem('metro-walker-quest');
 
-    // qidがあり、かつ「WALKING」状態のときだけ復元する
-    if (qid && state === 'WALKING') {
+    if (urlQid && savedState === 'WALKING') {
+      // パターンA: 共有URLから開いた、または普通にリロードした時
       setIsLoadingQuest(true);
-      fetch(`/api/quests/${qid}`)
+      fetch(`/api/quests/${urlQid}`)
         .then(res => {
           if (!res.ok) throw new Error("Quest not found");
           return res.json();
         })
         .then(data => {
-          // サーバーから取得したデータをセット
           setCurrentQuest(data);
+          // 自分のスマホにも記憶させておく（PWA対策）
+          localStorage.setItem('metro-walker-quest', JSON.stringify(data));
+          localStorage.setItem('metro-walker-qid', urlQid);
           setIsLoadingQuest(false);
         })
         .catch(err => {
           console.error("お題の復元に失敗しました", err);
           setIsLoadingQuest(false);
-          // 復元に失敗した場合は、URLの qid を消して通常通り新しいお題を生成させる
-          window.history.replaceState({}, '', window.location.pathname);
-          fetchNextQuest(); 
         });
-    }
-  }, [state]); // stateが復元されて 'WALKING' になったタイミングで発火
-  // --- ここまで追加 ---
-  
-  useEffect(() => {
-    localStorage.setItem('metro-walker-state', state);
-    localStorage.setItem('metro-walker-team-name', teamName);
-    localStorage.setItem('metro-walker-difficulty', difficulty);
-    localStorage.setItem('metro-walker-start-index', startStationIndex.toString());
-    localStorage.setItem('metro-walker-end-index', endStationIndex.toString());
-    if (selectedLine) localStorage.setItem('metro-walker-line-id', selectedLine.id);
-    localStorage.setItem('metro-walker-index', currentIndex.toString());
-    localStorage.setItem('metro-walker-history', JSON.stringify(history));
-    if (startTime) localStorage.setItem('metro-walker-start-time', startTime.toString());
-    if (lastStationTime) localStorage.setItem('metro-walker-last-time', lastStationTime.toString());
-  }, [state, selectedLine, currentIndex, history, teamName, difficulty, startStationIndex, endStationIndex, startTime, lastStationTime]);
 
-  useEffect(() => {
-    if (state === 'WALKING' && selectedLine && currentIndex !== endStationIndex) {
-      // 【追加】URLに qid がある場合は「リロード復元中」なので、新規生成をストップ！
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('qid')) {
-        return; 
+    } else if (!urlQid && savedState === 'WALKING' && savedQid && savedQuest) {
+      // パターンB: PWA（ホーム画面）から起動して、URLの qid が消えちゃった時！
+      try {
+        // スマホの記憶から即座に復元し...
+        setCurrentQuest(JSON.parse(savedQuest));
+        // 💡 URLに qid を復活させる（これでいつでもシェア可能！）
+        const newUrl = `${window.location.pathname}?qid=${savedQid}`;
+        window.history.replaceState({ path: newUrl }, '', newUrl);
+      } catch (e) {
+        console.error("ローカルお題の復元失敗", e);
       }
-
-      fetchNextQuest();
     }
-  }, [currentIndex, state, endStationIndex, selectedLine]);
+  }, []);
 
   const fetchNextQuest = async (isFoodChallenge: boolean = false) => {
     if (!selectedLine) return;
@@ -268,28 +253,25 @@ export default function App() {
     }
 
     try {
-      // 1. サーバーに「この駅からこの駅のお題を作って！」とお願いする
       const res = await fetch('/api/quests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentStation: current,
-          nextStation: next,
-          lineName: selectedLine.name,
-          difficulty: difficulty,
-          isFoodChallenge: isFoodChallenge
-        })
+        body: JSON.stringify({ currentStation: current, nextStation: next, lineName: selectedLine.name, difficulty, isFoodChallenge })
       });
       
       if (res.ok) {
         const data = await res.json();
         
-        // 2. サーバーから送られてきたIDでURLを書き換える
+        // 1. URLを書き換える（シェア用）
         const newUrl = `${window.location.pathname}?qid=${data.id}`;
         window.history.pushState({ path: newUrl }, '', newUrl);
         
-        // 3. サーバーが作ったお題を画面にセットする
+        // 2. 画面にセット
         setCurrentQuest(data.quest);
+
+        // 3. 💡 PWA対策としてスマホにも記憶させる
+        localStorage.setItem('metro-walker-qid', data.id);
+        localStorage.setItem('metro-walker-quest', JSON.stringify(data.quest));
       }
     } catch (err) {
       console.error("サーバーと通信できませんでした", err);
@@ -326,8 +308,10 @@ export default function App() {
   const handleNextStation = () => {
     if (!selectedLine || !currentQuest) return;
 
-    // 【追加】次の駅へ進むときは、古いお題のURLを消して綺麗にする
+    // 次の駅へ進むのでURLと記憶を綺麗にする
     window.history.replaceState({}, '', window.location.pathname);
+    localStorage.removeItem('metro-walker-qid');
+    localStorage.removeItem('metro-walker-quest');
 
     const nextIdx = currentIndex + step;
     const fromStation = selectedLine.stations[currentIndex];
@@ -485,6 +469,9 @@ export default function App() {
     localStorage.removeItem('metro-walker-end-index');
     localStorage.removeItem('metro-walker-start-time');
     localStorage.removeItem('metro-walker-last-time');
+    // リセット時にも記憶を消す
+    localStorage.removeItem('metro-walker-qid');
+    localStorage.removeItem('metro-walker-quest');
     
     setState('START');
     setSelectedLine(null);
