@@ -267,32 +267,36 @@ export default function App() {
       return;
     }
 
-    // 1. お題を生成
-    const quest = await generateQuest(current, next, selectedLine.name, difficulty, isFoodChallenge);
-
     try {
-      // 2. サーバーに保存してIDを発行してもらう
+      // 1. サーバーに「この駅からこの駅のお題を作って！」とお願いする
       const res = await fetch('/api/quests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(quest)
+        body: JSON.stringify({
+          currentStation: current,
+          nextStation: next,
+          lineName: selectedLine.name,
+          difficulty: difficulty,
+          isFoodChallenge: isFoodChallenge
+        })
       });
       
       if (res.ok) {
         const data = await res.json();
-        // 3. URLを書き換える (?qid=発行されたID)
+        
+        // 2. サーバーから送られてきたIDでURLを書き換える
         const newUrl = `${window.location.pathname}?qid=${data.id}`;
         window.history.pushState({ path: newUrl }, '', newUrl);
+        
+        // 3. サーバーが作ったお題を画面にセットする
+        setCurrentQuest(data.quest);
       }
     } catch (err) {
-      console.error("クエストの保存に失敗しました", err);
+      console.error("サーバーと通信できませんでした", err);
+    } finally {
+      setIsLoadingQuest(false);
     }
-
-    // 4. stateを更新して画面に表示
-    setCurrentQuest(quest);
-    setIsLoadingQuest(false);
   };
-
   const handleSelectLine = (line: MetroLine) => {
     setSelectedLine(line);
     setStartStationIndex(0);
