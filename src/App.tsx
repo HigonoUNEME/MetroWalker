@@ -39,32 +39,7 @@ interface WalkHistory {
   timeTakenMs?: number;
   timestamp?: number;
 }
-// App.tsx の適当な場所（コンポーネントの先頭付近）に追加
 
-useEffect(() => {
-  // URLから qid (クエストID) を取得
-  const params = new URLSearchParams(window.location.search);
-  const qid = params.get('qid');
-
-  if (qid) {
-    // IDがあればサーバーからクエストを取得して復元する
-    fetch(`/api/quests/${qid}`)
-      .then(res => {
-        if (!res.ok) throw new Error("Quest not found");
-        return res.json();
-      })
-      .then(data => {
-        // ここで取得したデータを state にセットする
-        // 例: setCurrentQuest(data);
-        // 例: setState('WALKING');
-        console.log("復元されたクエスト:", data);
-      })
-      .catch(err => {
-        console.error(err);
-        // 見つからなかった場合はURLからqidを消す等のエラーハンドリング
-      });
-  }
-}, []);
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371;
@@ -224,6 +199,36 @@ export default function App() {
     if (savedLastTime) setLastStationTime(parseInt(savedLastTime, 10));
   }, []);
 
+
+  // --- ここから追加：リロード時のお題復元処理 ---
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const qid = params.get('qid');
+
+    // qidがあり、かつ「WALKING」状態のときだけ復元する
+    if (qid && state === 'WALKING') {
+      setIsLoadingQuest(true);
+      fetch(`/api/quests/${qid}`)
+        .then(res => {
+          if (!res.ok) throw new Error("Quest not found");
+          return res.json();
+        })
+        .then(data => {
+          // サーバーから取得したデータをセット
+          setCurrentQuest(data);
+          setIsLoadingQuest(false);
+        })
+        .catch(err => {
+          console.error("お題の復元に失敗しました", err);
+          setIsLoadingQuest(false);
+          // 復元に失敗した場合は、URLの qid を消して通常通り新しいお題を生成させる
+          window.history.replaceState({}, '', window.location.pathname);
+          fetchNextQuest(); 
+        });
+    }
+  }, [state]); // stateが復元されて 'WALKING' になったタイミングで発火
+  // --- ここまで追加 ---
+  
   useEffect(() => {
     localStorage.setItem('metro-walker-state', state);
     localStorage.setItem('metro-walker-team-name', teamName);
