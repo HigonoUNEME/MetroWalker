@@ -255,7 +255,28 @@ export default function App() {
       setIsLoadingQuest(false);
       return;
     }
+
+    // 1. 今まで通りお題を生成 (現在は missionBank から取得)
     const quest = await generateQuest(current, next, selectedLine.name, difficulty, isFoodChallenge);
+
+    try {
+      // 2. サーバーに保存してIDを発行してもらう
+      const res = await fetch('/api/quests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quest)
+      });
+      const data = await res.json();
+      
+      // 3. URLを書き換える (?qid=発行されたID)
+      const newUrl = `${window.location.pathname}?qid=${data.id}`;
+      window.history.pushState({ path: newUrl }, '', newUrl);
+    } catch (err) {
+      console.error("クエストの保存に失敗しました", err);
+      // 万が一サーバー保存に失敗しても、ゲームが進むようにお題自体はセットします
+    }
+
+    // 4. stateを更新して画面に表示
     setCurrentQuest(quest);
     setIsLoadingQuest(false);
   };
