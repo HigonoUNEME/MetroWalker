@@ -1,3 +1,5 @@
+import { MISSION_BANK, FOOD_MISSIONS, SanpoQuest } from './missionBank';
+
 export interface StationSpecialty {
   famous: string[];
   foods: string[];
@@ -226,5 +228,47 @@ export const getStationSpecialty = (stationName: string): StationSpecialty => {
   return STATION_DATA[stationName] || {
     famous: ["地元の商店街", "歴史ある神社", "静かな公園"],
     foods: ["地元のパン屋さんのパン", "昔ながらの定食", "季節の和菓子"]
+  };
+};
+
+
+export const generateQuest = async (
+  currentStation: string, 
+  nextStation: string, 
+  lineName: string, 
+  difficulty: 'EASY' | 'NORMAL' | 'HARD', 
+  isFoodChallenge: boolean
+): Promise<SanpoQuest> => {
+  
+  // 今いる駅のデータを取得
+  const stationSpecialty = getStationSpecialty(currentStation);
+
+  let pool: SanpoQuest[];
+  let featureWord = "";
+
+  if (isFoodChallenge) {
+    // 食ミッションの場合はFOOD_MISSIONSを使い、駅のfoodsからランダムに選ぶ
+    pool = FOOD_MISSIONS;
+    featureWord = stationSpecialty.foods[Math.floor(Math.random() * stationSpecialty.foods.length)];
+  } else {
+    // 通常ミッションの場合はMISSION_BANKから難易度で絞り、駅のfamousからランダムに選ぶ
+    pool = MISSION_BANK.filter(m => m.difficulty === difficulty);
+    if (pool.length === 0) pool = MISSION_BANK; // 安全対策
+    featureWord = stationSpecialty.famous[Math.floor(Math.random() * stationSpecialty.famous.length)];
+  }
+
+  // リストから1つお題を引く
+  const randomIndex = Math.floor(Math.random() * pool.length);
+  const selected = pool[randomIndex];
+
+  // 選んだお題の中にある ${famous} や ${food} を、その駅の実際のデータに書き換えて返す
+  return {
+    theme: selected.theme,
+    mission: selected.mission
+      .replace(/\$\{famous\}/g, featureWord)
+      .replace(/\$\{food\}/g, featureWord),
+    hint: selected.hint,
+    difficulty: selected.difficulty,
+    isFoodMission: isFoodChallenge
   };
 };
