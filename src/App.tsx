@@ -315,6 +315,171 @@ export default function App() {
     pushRoomState({ currentIndex: startStationIndex, history: [], startTime: now, lastStationTime: now, capturedPhoto: null, questAttempt: 0 });
   };
 
+  // 💡 共通：サーバーに今の状況を「強制上書き」する関数
+  // 引数に「最新のデータ」を渡せるようにして、タイムラグを防ぎます
+  const pushRoomState = (overrides: any) => {
+    if (!roomId) return;
+    const payload = {
+      currentIndex,
+      history,
+      startTime,
+      lastStationTime,
+      capturedPhoto,
+      questAttempt,
+      state,
+      ...overrides
+    };
+    fetch(`/api/room/${roomId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(e => console.error("Sync error", e));
+  };
+
+  // 💡 3秒に1回の同期チェック（ここを大幅に強化！）
+  useEffect(() => {
+    if (state === 'START' || state === 'SETUP' || !roomId) return;
+    
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/room/${roomId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.startTime) {
+            // 1. 開始時間を同期（これが抜けていました！）
+            if (!startTime || Math.abs(startTime - data.startTime) > 1000) {
+              setStartTime(data.startTime);
+            }
+            // 2. 履歴（駅の進み具合）を同期
+            if (data.history && data.history.length > history.length) {
+              setHistory(data.history);
+              setCurrentIndex(data.currentIndex);
+              setLastStationTime(data.lastStationTime);
+              setQuestAttempt(data.questAttempt || 0);
+              setCapturedPhoto(data.capturedPhoto || null);
+              setCurrentQuest(null); // お題を再生成させる
+            }
+            // 3. 今の駅での写真を同期
+            if (data.capturedPhoto !== capturedPhoto) {
+              setCapturedPhoto(data.capturedPhoto || null);
+            }
+            // 4. 誰かがゴールしてたら自分もゴールへ
+            if (data.state === 'SUMMARY' && state !== 'SUMMARY') {
+              setState('SUMMARY');
+            }
+          }
+        }
+      } catch(e) {}
+    };
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  }, [state, roomId, history.length, capturedPhoto, startTime]);
+
+  // 💡 出発するボタンの処理
+  const handleStartWalk = async () => {
+    if (!roomId) return;
+
+    let targetStartTime = Date.now();
+    let targetIndex = startStationIndex;
+    let targetHistory = [];
+
+    // まずサーバーを見に行って、誰かが出発済みならそのデータをもらう
+    try {
+      const res = await fetch(`/api/room/${roomId}`);
+      const data = await res.json();
+      if (data && data.startTime) {
+        targetStartTime = data.startTime;
+        targetIndex = data.currentIndex;
+        targetHistory = data.history || [];
+      }
+    } catch (e) {}
+
+    // 自分の画面に反映
+    setStartTime(targetStartTime);
+    setCurrentIndex(targetIndex);
+    setHistory(targetHistory);
+    setState('WALKING');
+
+    // サーバーに「参加したよ（または開始したよ）」と保存
+    pushRoomState({
+      state: 'WALKING',
+      startTime: targetStartTime,
+      currentIndex: targetIndex,
+      history: targetHistory
+    });
+  };
+
+  // 💡 次の駅ボタン
+  const handleNextStation = () => {
+    if (!selectedLine || !currentQuest) return;
+
+    const nextIdx = currentIndex + step;
+    const now = Date.now();
+    const timeTakenMs = lastStationTime ? now - lastStationTime : 0;
+    
+    const newHistoryItem: WalkHistory = {
+      from: selectedLine.stations[currentIndex],
+      to: selectedLine.stations[nextIdx],
+      quest: currentQuest,
+      photo: capturedPhoto || undefined,
+      timeTakenMs,
+      timestamp: now
+    };
+    const updatedHistory = [...history, newHistoryItem];
+
+    setHistory(updatedHistory);
+    setCapturedPhoto(null);
+    setQuestAttempt(0);
+    setLastStationTime(now);
+
+    const isGoal = (nextIdx === endStationIndex);
+    const nextState = isGoal ? 'SUMMARY' : 'WALKING';
+    
+    if (isGoal) {
+      setState('SUMMARY');
+    } else {
+      setCurrentIndex(nextIdx);
+    }
+    setCurrentQuest(null);
+
+    // 💡 確定した最新の値をサーバーに送る
+    pushRoomState({
+      state: nextState,
+      currentIndex: nextIdx,
+      history: updatedHistory,
+      capturedPhoto: null,
+      questAttempt: 0,
+      lastStationTime: now
+    });
+  };
+
+  // 💡 写真アップロード
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // (画像リサイズ処理は今のままでOK...)
+    // canvas.toDataURL のあとの処理：
+    try {
+      const response = await fetch(compressedDataUrl);
+      const blobData = await response.blob();
+      // ファイル名は重複しないようにURLパラメータで工夫
+      const uploadResponse = await fetch(`/api/upload?filename=${roomId}-${Date.now()}.jpg`, {
+        method: 'POST',
+        body: blobData
+      });
+      const result = await uploadResponse.json();
+      
+      if (result.url) {
+        setCapturedPhoto(result.url);
+        // 💡 写真が上がったら即座に全員に知らせる！
+        pushRoomState({ capturedPhoto: result.url });
+      }
+    } catch (err) {
+      alert('写真が保存できませんでした。Vercel Blobの設定を確認してください。');
+    }
+  };
+  
   const handleNextStation = () => {
     if (!selectedLine || !currentQuest) return;
 
