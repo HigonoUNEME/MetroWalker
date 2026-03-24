@@ -1,9 +1,5 @@
 {
-  "version": 2,
   "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/server.ts"
-    }
+    { "source": "/api/(.*)", "destination": "/server.ts" }
   ]
 }
