@@ -1,7 +1,7 @@
 {
   "functions": {
     "server.ts": {
-      "runtime": "vercel-node@latest"
+      "runtime": "@vercel/node"
     }
   },
   "rewrites": [
