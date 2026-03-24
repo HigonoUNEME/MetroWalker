@@ -244,6 +244,12 @@ export default function App() {
 
   useEffect(() => {
     if (state === 'WALKING' && selectedLine && currentIndex !== endStationIndex) {
+      // 【追加】URLに qid がある場合は「リロード復元中」なので、新規生成をストップ！
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('qid')) {
+        return; 
+      }
+
       fetchNextQuest();
     }
   }, [currentIndex, state, endStationIndex, selectedLine]);
