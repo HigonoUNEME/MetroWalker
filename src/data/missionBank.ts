@@ -1,11 +1,13 @@
-export interface MissionTemplate {
+export interface SanpoQuest {
   theme: string;
   mission: string;
   hint: string;
   difficulty: 'EASY' | 'NORMAL' | 'HARD';
+  isFoodMission?: boolean;
 }
 
-export const MISSION_BANK: MissionTemplate[] = [
+// いただいた最高のお題リスト
+export const MISSION_BANK: SanpoQuest[] = [
   { theme: "看板探偵", mission: "この区間で一番「フォントが個性的」な看板を見つけて写真を撮ってください。", hint: "古い喫茶店やクリーニング屋さんの看板は狙い目です。", difficulty: "EASY" },
   { theme: "昭和ノスタルジー", mission: "「昭和」を感じさせるものを3つ見つけてください。", hint: "タバコ屋さんのカウンター、タイル貼りの壁、古いポストなど。", difficulty: "NORMAL" },
   { theme: "カラーハンター", mission: "路線の色と同じ色のものを5つ見つけてください。", hint: "看板、服、車、花など、意外なところにあります。", difficulty: "EASY" },
@@ -202,3 +204,39 @@ export const MISSION_BANK: MissionTemplate[] = [
   { theme: "看板の影", mission: "看板の影が隣の建物の窓に映っている場所を探してください。", hint: "影の越境。", difficulty: "HARD" },
   { theme: "街の窓", mission: "窓ガラスに「気泡」が入っている、とても古い窓を探してください。", hint: "歴史の証人としての窓。", difficulty: "HARD" }
 ];
+
+// 食ミッション用（5駅ごとにApp.tsxから呼ばれます）
+export const FOOD_MISSIONS: SanpoQuest[] = [
+  { theme: "地元パンの誘惑", mission: "チェーン店ではない、地元のパン屋さんを見つけて一番人気のパンを買おう！", hint: "パンの焼けるいい匂いを辿ってみて。", difficulty: "NORMAL", isFoodMission: true },
+  { theme: "食べ歩きスイーツ", mission: "たい焼き、クレープ、ソフトクリームなど、片手で食べられるスイーツを見つけて楽しもう。", hint: "商店街の入り口付近が探しやすいです。", difficulty: "EASY", isFoodMission: true },
+  { theme: "路地裏の名店探し", mission: "メニューが手書きの定食屋か、年季の入った町中華を見つけよう。", hint: "赤ちょうちんや食品サンプルが目印！", difficulty: "HARD", isFoodMission: true }
+];
+
+// App.tsx と server.ts から呼ばれる「AIのフリをしてリストから一瞬で返す」関数
+export const generateQuest = async (
+  currentStation: string, 
+  nextStation: string, 
+  lineName: string, 
+  difficulty: 'EASY' | 'NORMAL' | 'HARD', 
+  isFoodChallenge: boolean
+): Promise<SanpoQuest> => {
+  
+  // 食ミッションか、通常のミッション（難易度で絞り込み）かを選択
+  const pool = isFoodChallenge ? FOOD_MISSIONS : MISSION_BANK.filter(m => m.difficulty === difficulty);
+  
+  // 万が一絞り込み結果が0件なら全体から選ぶ（安全対策）
+  const targetPool = pool.length > 0 ? pool : MISSION_BANK;
+  
+  // ランダムに1つ引く
+  const randomIndex = Math.floor(Math.random() * targetPool.length);
+  const selected = targetPool[randomIndex];
+
+  // 選んだミッションを返す（${famous} を 今の駅周辺名物 に変換するおまけ付き！）
+  return {
+    theme: selected.theme,
+    mission: selected.mission.replace(/\$\{famous\}/g, `${currentStation}周辺の名物`),
+    hint: selected.hint,
+    difficulty: selected.difficulty,
+    isFoodMission: isFoodChallenge
+  };
+};
