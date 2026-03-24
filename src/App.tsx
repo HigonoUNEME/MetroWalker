@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 import { METRO_LINES, MetroLine, Station } from './constants';
-import { generateQuest, SanpoQuest } from './services/geminiService';
+import { SanpoQuest } from './data/missionBank';
 import StationLogo from './components/StationLogo';
 
 type AppState = 'START' | 'SETUP' | 'WALKING' | 'SUMMARY';
