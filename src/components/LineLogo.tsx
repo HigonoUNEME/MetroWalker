@@ -18,7 +18,7 @@ const LineLogo: React.FC<LineLogoProps> = ({
   return (
     <div className={`${size} flex-shrink-0`}>
       <img
-        src={`/logos/line/${line.id.toUpperCase()}.jpg`}
+        src={`/line/${line.id.toUpperCase()}.jpg`}
         alt={line.name}
         className="w-full h-full object-contain"
       />
