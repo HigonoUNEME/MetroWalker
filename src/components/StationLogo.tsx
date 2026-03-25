@@ -24,7 +24,7 @@ const StationLogo: React.FC<StationLogoProps> = ({
   return (
     <div className={`${size} flex-shrink-0`}>
       <img
-        src={`/logos/station/${code}.jpg`}
+        src={`/station/${code}.jpg`}
         alt={code}
         className="w-full h-full object-contain"
       />
