@@ -6,18 +6,22 @@ interface LineLogoProps {
   size?: string;
 }
 
-const LineLogo: React.FC<LineLogoProps> = ({ line, size = "w-8 h-8" }) => {
+/**
+ * 東京メトロ公式路線記号画像を使用したロゴコンポーネント。
+ * 画像は public/logos/line/{line.id}.jpg に配置。
+ * （例: public/logos/line/G.jpg, M.jpg, H.jpg ...）
+ */
+const LineLogo: React.FC<LineLogoProps> = ({
+  line,
+  size = 'w-10 h-10',
+}) => {
   return (
-    <div 
-      className={`${size} rounded-full flex items-center justify-center shadow-sm`}
-      style={{ backgroundColor: line.color }}
-    >
-      <span 
-        className="text-white font-black leading-none text-[60%]"
-        style={{ fontFamily: "Arial, sans-serif" }}
-      >
-        {line.id}
-      </span>
+    <div className={`${size} flex-shrink-0`}>
+      <img
+        src={`/logos/line/${line.id.toUpperCase()}.jpg`}
+        alt={line.name}
+        className="w-full h-full object-contain"
+      />
     </div>
   );
 };
