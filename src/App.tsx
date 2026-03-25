@@ -15,6 +15,7 @@ import { METRO_LINES, MetroLine, Station } from './constants';
 import { SanpoQuest } from './data/missionBank';
 import { generateQuestLocal } from './data/stationData';
 import StationLogo from './components/StationLogo';
+import LineLogo from './components/LineLogo';
 
 type AppState = 'START' | 'SETUP' | 'SHARE' | 'WALKING' | 'SUMMARY';
 type Difficulty = 'EASY' | 'NORMAL' | 'HARD';
@@ -271,8 +272,12 @@ export default function App() {
   };
 
   const handleChangeQuest = () => {
+    if (!selectedLine) return;
     const nextAttempt = questAttempt + 1;
-    setQuestAttempt(nextAttempt); setCurrentQuest(null); 
+    const current = selectedLine.stations[currentIndex]?.name || "";
+    const newQuest = generateQuestLocal(roomId || "SOLO", current, difficulty, false, nextAttempt);
+    setQuestAttempt(nextAttempt);
+    setCurrentQuest(newQuest);
     pushRoomState({ questAttempt: nextAttempt });
   };
 
@@ -341,7 +346,7 @@ export default function App() {
             <AnimatePresence mode="wait">
               {state !== 'START' && selectedLine ? (
                 <motion.button key="line-logo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => setShowRouteMap(true)} className="flex items-center gap-3">
-                  <StationLogo line={selectedLine} stationNumber={selectedLine.id} size="w-10 h-10" />
+                  <LineLogo line={selectedLine} size="w-10 h-10" />
                   <div className="text-left">
                     <h1 className="font-black text-lg leading-none">{selectedLine.name}</h1>
                     <div className="text-[10px] font-bold text-neutral-400 mt-1 uppercase tracking-widest flex items-center gap-1"><Map className="w-3 h-3" /> View Map</div>
@@ -361,7 +366,7 @@ export default function App() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4" onClick={() => setShowRouteMap(false)}>
               <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="bg-white sm:rounded-3xl rounded-t-3xl w-full max-w-md h-[85vh] flex flex-col overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 <div className="p-6 border-b flex items-center justify-between">
-                  <div className="flex items-center gap-3"><StationLogo line={selectedLine} stationNumber={selectedLine.id} size="w-10 h-10" /><div><h3 className="font-bold text-lg">{selectedLine.name}</h3><div className="text-[10px] text-neutral-400">Route Map</div></div></div>
+                  <div className="flex items-center gap-3"><LineLogo line={selectedLine} size="w-10 h-10" /><div><h3 className="font-bold text-lg">{selectedLine.name}</h3><div className="text-[10px] text-neutral-400">Route Map</div></div></div>
                   <button onClick={() => setShowRouteMap(false)} className="p-2 bg-neutral-100 rounded-full"><X className="w-5 h-5" /></button>
                 </div>
                 <div className="overflow-y-auto p-8 flex-1">
@@ -400,7 +405,7 @@ export default function App() {
                   <div className="space-y-2"><label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Team Name</label><input type="text" value={teamName} onChange={(e) => setTeamName(e.target.value)} className="w-full p-4 rounded-2xl border bg-neutral-50 font-bold outline-none" placeholder="チーム名を入力" /></div>
                   <div className="space-y-2"><label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Difficulty</label><div className="grid grid-cols-3 gap-2">{(['EASY', 'NORMAL', 'HARD'] as Difficulty[]).map((d) => (<button key={d} onClick={() => setDifficulty(d)} className={`p-3 rounded-xl text-xs font-bold border-2 transition-all ${difficulty === d ? 'bg-neutral-900 border-neutral-900 text-white' : 'bg-white text-neutral-400'}`}>{d}</button>))}</div></div>
                 </div>
-                <div className="space-y-4"><label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Select Line</label><div className="grid gap-3">{METRO_LINES.map((line) => (<button key={line.id} onClick={() => handleSelectLine(line)} className="group flex items-center justify-between p-4 rounded-2xl border bg-white hover:shadow-md transition-all"><div className="flex items-center gap-4"><StationLogo line={line} stationNumber={line.id} size="w-10 h-10" /><div><div className="font-bold text-neutral-800">{line.name}</div><div className="text-xs text-neutral-400">{line.stations.length} 駅</div></div></div><ChevronRight className="w-5 h-5 text-neutral-300" /></button>))}</div></div>
+                <div className="space-y-4"><label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Select Line</label><div className="grid gap-3">{METRO_LINES.map((line) => (<button key={line.id} onClick={() => handleSelectLine(line)} className="group flex items-center justify-between p-4 rounded-2xl border bg-white hover:shadow-md transition-all"><div className="flex items-center gap-4"><LineLogo line={line} size="w-10 h-10" /><div><div className="font-bold text-neutral-800">{line.name}</div><div className="text-xs text-neutral-400">{line.stations.length} 駅</div></div></div><ChevronRight className="w-5 h-5 text-neutral-300" /></button>))}</div></div>
               </motion.div>
             )}
 
