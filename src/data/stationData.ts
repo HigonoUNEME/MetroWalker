@@ -289,14 +289,15 @@ export const generateQuestLocal = (
   roomId: string,
   currentStation: string, 
   difficulty: 'EASY' | 'NORMAL' | 'HARD', 
-  isFoodChallenge: boolean
+  isFoodChallenge: boolean,
+  questAttempt: number = 0
 ): SanpoQuest => {
   const stationSpecialty = getStationSpecialty(currentStation);
   let pool = isFoodChallenge ? FOOD_MISSIONS : MISSION_BANK.filter(m => m.difficulty === difficulty);
   if (pool.length === 0) pool = MISSION_BANK;
   
-  // ルームIDと駅名を混ぜてハッシュ化（同じルーム・同じ駅ならスマホが違っても絶対に同じ数字になる！）
-  const hash = getHash(`${roomId}-${currentStation}`);
+  // questAttempt をハッシュに混ぜることで、Changeのたびに異なるお題になる
+  const hash = getHash(`${roomId}-${currentStation}-${questAttempt}`);
   
   const featureArray = isFoodChallenge ? stationSpecialty.foods : stationSpecialty.famous;
   const featureWord = featureArray[hash % featureArray.length];
