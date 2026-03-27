@@ -325,6 +325,8 @@ export default function App() {
       const endStation = selectedLine.stations[endStationIndex]?.name || '';
       
       const photoUrls = history.filter(item => item.photo).map(item => item.photo).slice(0, 4);
+      
+      // あなたの素晴らしい og/index.tsx にデータを渡す準備
       const params = new URLSearchParams({ 
         line: selectedLine.name, 
         dist: totalDistance.toFixed(2), 
@@ -336,22 +338,28 @@ export default function App() {
       });
       photoUrls.forEach((url, i) => { if (url) params.append(`p${i + 1}`, url); });
       
-      // 画像生成APIを叩く
+      // 画像を生成
       const response = await fetch(`/api/og?${params.toString()}`);
       if (!response.ok) throw new Error('画像生成エラー');
       const blob = await response.blob();
-      const file = new File([blob], 'metrowalker-result.png', { type: 'image/png' });
+      const file = new File([blob], 'metrowalker.png', { type: 'image/png' });
 
-      // 💡 ここが新しいX（Twitter）用のシェアテキスト！
+      // 🌟 ここが X (Twitter) 用のシェアテキストです！自由に書き換えてOKです
       const shareText = `MetroWalkerで${selectedLine.name}を完走！🚶‍♂️✨\n📍 区間: ${startStation}駅 → ${endStation}駅\n⏱️ タイム: ${timeStr}\n🥾 距離: ${totalDistance.toFixed(2)}km\n\n#MetroWalker #東京散歩 #${selectedLine.name}\n`;
-      const shareUrl = window.location.origin; // アプリのトップページのURL
+      const shareUrl = window.location.origin;
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) { 
-        await navigator.share({ title: 'MetroWalker', text: shareText, url: shareUrl, files: [file] }); 
+        // スマホの場合はシェアシートが開く
+        await navigator.share({ 
+          title: 'MetroWalker', 
+          text: shareText, 
+          url: shareUrl, 
+          files: [file] 
+        }); 
       } else { 
-        // PCなどの場合は画像をダウンロードさせつつ、テキストをクリップボードにコピー
+        // PCの場合は画像をダウンロード＆テキストをコピー
         const url = URL.createObjectURL(blob); 
-        const a = document.createElement('a'); a.href = url; a.download = 'metrowalker-result.png'; a.click(); 
+        const a = document.createElement('a'); a.href = url; a.download = 'metrowalker.png'; a.click(); 
         await navigator.clipboard.writeText(shareText + "\n" + shareUrl);
         alert('画像を保存し、テキストをコピーしました！X（Twitter）に貼り付けて投稿してください。'); 
       }
