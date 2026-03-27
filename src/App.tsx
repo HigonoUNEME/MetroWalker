@@ -321,16 +321,46 @@ export default function App() {
     setIsGeneratingShare(true);
     try {
       const timeStr = startTime ? formatTimeMs(Date.now() - startTime) : '--:--';
+      const startStation = selectedLine.stations[startStationIndex]?.name || '';
+      const endStation = selectedLine.stations[endStationIndex]?.name || '';
+      
       const photoUrls = history.filter(item => item.photo).map(item => item.photo).slice(0, 4);
-      const params = new URLSearchParams({ line: selectedLine.name, dist: totalDistance.toFixed(2), time: timeStr, team: teamName || 'ゲスト', start: selectedLine.stations[startStationIndex]?.name || '', end: selectedLine.stations[endStationIndex]?.name || '', stations: (totalSteps + 1).toString() });
+      const params = new URLSearchParams({ 
+        line: selectedLine.name, 
+        dist: totalDistance.toFixed(2), 
+        time: timeStr, 
+        team: teamName || 'ゲスト', 
+        start: startStation, 
+        end: endStation, 
+        stations: (totalSteps + 1).toString() 
+      });
       photoUrls.forEach((url, i) => { if (url) params.append(`p${i + 1}`, url); });
+      
+      // 画像生成APIを叩く
       const response = await fetch(`/api/og?${params.toString()}`);
       if (!response.ok) throw new Error('画像生成エラー');
       const blob = await response.blob();
-      const file = new File([blob], 'metrowalker.png', { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ title: 'MetroWalker', files: [file] }); }
-      else { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'metrowalker.png'; a.click(); alert('保存しました。'); }
-    } catch (e) { alert('失敗しました。'); } finally { setIsGeneratingShare(false); }
+      const file = new File([blob], 'metrowalker-result.png', { type: 'image/png' });
+
+      // 💡 ここが新しいX（Twitter）用のシェアテキスト！
+      const shareText = `MetroWalkerで${selectedLine.name}を完走！🚶‍♂️✨\n📍 区間: ${startStation}駅 → ${endStation}駅\n⏱️ タイム: ${timeStr}\n🥾 距離: ${totalDistance.toFixed(2)}km\n\n#MetroWalker #東京散歩 #${selectedLine.name}\n`;
+      const shareUrl = window.location.origin; // アプリのトップページのURL
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { 
+        await navigator.share({ title: 'MetroWalker', text: shareText, url: shareUrl, files: [file] }); 
+      } else { 
+        // PCなどの場合は画像をダウンロードさせつつ、テキストをクリップボードにコピー
+        const url = URL.createObjectURL(blob); 
+        const a = document.createElement('a'); a.href = url; a.download = 'metrowalker-result.png'; a.click(); 
+        await navigator.clipboard.writeText(shareText + "\n" + shareUrl);
+        alert('画像を保存し、テキストをコピーしました！X（Twitter）に貼り付けて投稿してください。'); 
+      }
+    } catch (e) { 
+      console.error(e);
+      alert('シェア準備に失敗しました。'); 
+    } finally { 
+      setIsGeneratingShare(false); 
+    }
   };
 
   const resetApp = () => { localStorage.clear(); window.location.href = window.location.pathname; };
