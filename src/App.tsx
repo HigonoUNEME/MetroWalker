@@ -264,9 +264,24 @@ export default function App() {
     const now = Date.now();
     const newHistoryItem = { from: selectedLine.stations[currentIndex], to: selectedLine.stations[nextIdx], quest: currentQuest, photo: capturedPhoto || undefined, timestamp: now };
     const updatedHistory = [...history, newHistoryItem];
-    setHistory(updatedHistory); setCapturedPhoto(null); setQuestAttempt(0);
+    
+    setHistory(updatedHistory); 
+    setCapturedPhoto(null); 
+    setQuestAttempt(0);
+    
     const isGoal = nextIdx === endStationIndex;
-    if (isGoal) setState('SUMMARY'); else setCurrentIndex(nextIdx);
+    if (isGoal) {
+      setState('SUMMARY');
+    } else {
+      setCurrentIndex(nextIdx);
+      
+      // 💡 ここが消えていました！5駅進むごとに食ミッションのダイアログを出す
+      const relativeIdx = Math.abs(nextIdx - startStationIndex);
+      if (relativeIdx > 0 && relativeIdx % 5 === 0) {
+        setShowFoodDialog(true);
+      }
+    }
+    
     setCurrentQuest(null);
     pushRoomState({ state: isGoal ? 'SUMMARY' : 'WALKING', currentIndex: nextIdx, history: updatedHistory, capturedPhoto: null, questAttempt: 0 });
   };
