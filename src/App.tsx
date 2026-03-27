@@ -345,7 +345,7 @@ export default function App() {
       const file = new File([blob], 'metrowalker.png', { type: 'image/png' });
 
       // 🌟 ここが X (Twitter) 用のシェアテキストです！自由に書き換えてOKです
-      const shareText = `MetroWalkerで${selectedLine.name}を完走！🚶‍♂️✨\n📍 区間: ${startStation}駅 → ${endStation}駅\n⏱️ タイム: ${timeStr}\n🥾 距離: ${totalDistance.toFixed(2)}km\n\n#MetroWalker #東京散歩 #${selectedLine.name}\n`;
+      const shareText = `MetroWalkerで${selectedLine.name}を歩きました！🚶‍♂️✨\n📍 区間: ${startStation}駅 → ${endStation}駅\n⏱️ タイム: ${timeStr}\n🥾 距離: ${totalDistance.toFixed(2)}km\n\n#MetroWalker #東京散歩 #${selectedLine.name}\n`;
       const shareUrl = window.location.origin;
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) { 
